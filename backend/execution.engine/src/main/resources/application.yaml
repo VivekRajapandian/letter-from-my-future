@@ -1,0 +1,21 @@
+spring:
+  application:
+    name: execution.engine
+  datasource:
+    url: jdbc:postgresql://localhost:5432/execution_engine
+    username: execution_user
+    password: StrongPassword123!
+
+    jpa:
+      hibernate:
+        ddl-auto: validate   # NEVER use update/create
+      properties:
+        hibernate:
+          format_sql: true
+      open-in-view: false
+
+    liquibase:
+      change-log: classpath:db/changelog/db.changelog-master.yaml
+
+server:
+  port: 8080
