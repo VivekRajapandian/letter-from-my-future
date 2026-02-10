@@ -1,0 +1,46 @@
+databaseChangeLog:
+  - changeSet:
+      id: 004-create-phases
+      author: vivek
+      changes:
+        - createTable:
+            tableName: phases
+            columns:
+
+              - column:
+                  name: id
+                  type: UUID
+                  defaultValueComputed: uuid_generate_v4()
+                  constraints:
+                    primaryKey: true
+
+              - column:
+                  name: goal_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: title
+                  type: VARCHAR(255)
+
+              - column:
+                  name: order_index
+                  type: INT
+
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+        - addForeignKeyConstraint:
+            baseTableName: phases
+            baseColumnNames: goal_id
+            referencedTableName: goals
+            referencedColumnNames: id
+            constraintName: fk_phase_goal
+
+        - addUniqueConstraint:
+            tableName: phases
+            columnNames: goal_id, order_index
+            constraintName: uq_phase_order
+

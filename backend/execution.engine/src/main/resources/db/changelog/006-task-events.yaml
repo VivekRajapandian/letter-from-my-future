@@ -1,0 +1,32 @@
+databaseChangeLog:
+  - changeSet:
+      id: 006-create-task-events
+      author: vivek
+      changes:
+        - createTable:
+            tableName: task_events
+            columns:
+
+              - column:
+                  name: id
+                  type: UUID
+                  defaultValueComputed: uuid_generate_v4()
+                  constraints:
+                    primaryKey: true
+
+              - column:
+                  name: task_id
+                  type: UUID
+
+              - column:
+                  name: event_type
+                  type: VARCHAR(50)
+
+              - column:
+                  name: metadata
+                  type: JSONB
+
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
