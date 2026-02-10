@@ -1,0 +1,38 @@
+databaseChangeLog:
+  - changeSet:
+      id: 003-create-goals
+      author: vivek
+      changes:
+        - createTable:
+            tableName: goals
+            columns:
+
+              - column:
+                  name: id
+                  type: UUID
+                  defaultValueComputed: uuid_generate_v4()
+                  constraints:
+                    primaryKey: true
+
+              - column:
+                  name: user_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: title
+                  type: VARCHAR(255)
+
+              - column:
+                  name: status
+                  type: VARCHAR(50)
+
+              - column:
+                  name: target_date
+                  type: DATE
+
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP

@@ -1,0 +1,28 @@
+databaseChangeLog:
+  - changeSet:
+      id: 007-create-plan-versions
+      author: vivek
+      changes:
+        - createTable:
+            tableName: plan_versions
+            columns:
+
+              - column:
+                  name: id
+                  type: UUID
+                  defaultValueComputed: uuid_generate_v4()
+                  constraints:
+                    primaryKey: true
+
+              - column:
+                  name: goal_id
+                  type: UUID
+
+              - column:
+                  name: plan_json
+                  type: JSONB
+
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP

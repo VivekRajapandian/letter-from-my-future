@@ -1,0 +1,53 @@
+databaseChangeLog:
+  - changeSet:
+      id: 005-create-tasks
+      author: vivek
+      changes:
+        - createTable:
+            tableName: tasks
+            columns:
+
+              - column:
+                  name: id
+                  type: UUID
+                  defaultValueComputed: uuid_generate_v4()
+                  constraints:
+                    primaryKey: true
+
+              - column:
+                  name: phase_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: title
+                  type: VARCHAR(255)
+
+              - column:
+                  name: description
+                  type: TEXT
+
+              - column:
+                  name: status
+                  type: VARCHAR(50)
+
+              - column:
+                  name: order_index
+                  type: INT
+
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+        - addForeignKeyConstraint:
+            baseTableName: tasks
+            baseColumnNames: phase_id
+            referencedTableName: phases
+            referencedColumnNames: id
+            constraintName: fk_task_phase
+
+        - addUniqueConstraint:
+            tableName: tasks
+            columnNames: phase_id, order_index
+            constraintName: uq_task_order
