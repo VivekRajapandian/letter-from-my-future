@@ -1,0 +1,25 @@
+databaseChangeLog:
+  - changeSet:
+      id: 015-plan-json-check
+      author: vivek
+      changes:
+
+        # Step 1 — Ensure no existing bad rows
+        - sql:
+            sql: >
+              DELETE FROM plan_versions
+              WHERE plan_json IS NULL
+              OR plan_json::text = '';
+
+        # Step 2 — Add NOT NULL constraint
+        - addNotNullConstraint:
+            tableName: plan_versions
+            columnName: plan_json
+            columnDataType: jsonb
+
+        # Step 3 — Add check constraint (extra safety)
+        - sql:
+            sql: >
+              ALTER TABLE plan_versions
+              ADD CONSTRAINT chk_plan_json_not_null
+              CHECK (plan_json IS NOT NULL);

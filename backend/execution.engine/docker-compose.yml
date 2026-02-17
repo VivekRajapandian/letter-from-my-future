@@ -1,0 +1,28 @@
+services:
+  db:
+    image: postgres:16
+    container_name: execution_db
+    environment:
+      POSTGRES_DB: execution_engine
+      POSTGRES_USER: execution_user
+      POSTGRES_PASSWORD: execution_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - execution_db_data:/var/lib/postgresql/data
+
+  app:
+    build: .
+    container_name: execution_app
+    depends_on:
+      - db
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL: jdbc:postgresql://db:5432/execution_engine
+      DB_USER: execution_user
+      DB_PASSWORD: execution_pass
+    ports:
+      - "8080:8080"
+
+volumes:
+  execution_db_data:

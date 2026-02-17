@@ -1,0 +1,19 @@
+databaseChangeLog:
+  - changeSet:
+      id: 018-add-external-id
+      author: vivek
+      changes:
+
+        - addColumn:
+            tableName: users
+            columns:
+              - column:
+                  name: external_id
+                  type: VARCHAR(255)
+
+        - createIndex:
+            tableName: users
+            indexName: idx_user_external_id
+            columns:
+              - column:
+                  name: external_id

@@ -4,7 +4,8 @@ package com.letterfuture.execution.engine.workflow.compiler;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.letterfuture.execution.engine.enums.GoalStatus;
 import com.letterfuture.execution.engine.enums.TaskStatus;
-import com.letterfuture.execution.engine.workflow.compiler.dto.PlanDto;
+import com.letterfuture.execution.engine.workflow.dto.PlanDto;
+import com.letterfuture.execution.engine.workflow.dto.PhaseDto;
 import com.letterfuture.execution.engine.workflow.domain.*;
 import com.letterfuture.execution.engine.workflow.repository.*;
 import jakarta.transaction.Transactional;
@@ -37,9 +38,10 @@ public class PlanCompiler {
      */
     @Transactional
     public UUID compileAndCreateGoal(UUID userId, String rawPlanJson) {
-
+        //Validation → Structure → Normalize → Limits.
         PlanDto dto = parseStrict(rawPlanJson);
         validate(dto);
+        enforceStructuralRules(dto);
         PlanDto normalized = normalize(dto);
         enforceLimits(normalized);
 
@@ -97,6 +99,31 @@ public class PlanCompiler {
 
         return goal.getId();
     }
+
+    private void enforceStructuralRules(PlanDto dto){
+
+        dto.getPhases().forEach(phase -> {
+
+            if(phase.getTasks() == null || phase.getTasks().isEmpty()){
+                throw new IllegalArgumentException(
+                        "Phase '" + phase.getTitle() + "' cannot be empty");
+            }
+        });
+    }
+
+    private void enforceDuration(PlanDto dto){
+
+        int total = dto.getPhases()
+                .stream()
+                .mapToInt(PhaseDto::getDurationDays)
+                .sum();
+
+        if(total > 3650){
+            throw new IllegalArgumentException(
+                    "Plan duration exceeds safe limit");
+        }
+    }
+
 
     private PlanDto parseStrict(String rawJson) {
         try {

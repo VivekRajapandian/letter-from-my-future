@@ -1,8 +1,10 @@
 package com.letterfuture.execution.engine.workflow.domain;
 
+import com.vladmihalcea.hibernate.type.json.JsonBinaryType;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.Type;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -20,6 +22,7 @@ public class PlanVersion {
 
     private UUID goalId;
 
+    @Type(JsonBinaryType.class)
     @Column(columnDefinition = "jsonb")
     private String planJson;
 

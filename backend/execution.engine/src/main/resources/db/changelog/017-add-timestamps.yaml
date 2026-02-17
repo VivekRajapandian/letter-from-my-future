@@ -1,0 +1,26 @@
+databaseChangeLog:
+  - changeSet:
+      id: 017-add-timestamps
+      author: vivek
+      changes:
+
+        - addColumn:
+            tableName: goals
+            columns:
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+
+        - addColumn:
+            tableName: phases
+            columns:
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+
+        - addColumn:
+            tableName: tasks
+            columns:
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP

@@ -1,0 +1,5 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/execution_engine
+    username: execution_user
+    password: execution_pass

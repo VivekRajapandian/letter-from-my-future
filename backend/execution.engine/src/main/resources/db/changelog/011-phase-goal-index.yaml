@@ -1,0 +1,11 @@
+databaseChangeLog:
+  - changeSet:
+      id: 011-phase-goal-index
+      author: vivek
+      changes:
+        - createIndex:
+            tableName: phases
+            indexName: idx_phase_goal
+            columns:
+              - column:
+                  name: goal_id

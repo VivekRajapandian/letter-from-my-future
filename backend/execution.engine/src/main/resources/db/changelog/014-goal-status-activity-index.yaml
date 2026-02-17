@@ -1,0 +1,14 @@
+databaseChangeLog:
+  - changeSet:
+      id: 014-goal-status-activity-index
+      author: vivek
+      changes:
+
+        - createIndex:
+            tableName: goals
+            indexName: idx_goal_status_activity
+            columns:
+              - column:
+                  name: status
+              - column:
+                  name: last_activity_at

@@ -1,0 +1,20 @@
+databaseChangeLog:
+  - changeSet:
+      id: 012-task-status-not-null
+      author: vivek
+      changes:
+
+        # Step 1 — Fix existing nulls (safety)
+        - update:
+            tableName: tasks
+            columns:
+              - column:
+                  name: status
+                  value: LOCKED
+            where: status IS NULL
+
+        # Step 2 — Enforce constraint
+        - addNotNullConstraint:
+            tableName: tasks
+            columnName: status
+            columnDataType: VARCHAR(50)

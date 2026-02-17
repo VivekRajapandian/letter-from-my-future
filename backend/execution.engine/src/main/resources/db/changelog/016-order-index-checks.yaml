@@ -1,0 +1,19 @@
+databaseChangeLog:
+  - changeSet:
+      id: 016-order-index-checks
+      author: vivek
+      changes:
+
+        # PHASE ordering must be >= 0
+        - sql:
+            sql: >
+              ALTER TABLE phases
+              ADD CONSTRAINT chk_phase_order_positive
+              CHECK (order_index >= 0);
+
+        # TASK ordering must be >= 0
+        - sql:
+            sql: >
+              ALTER TABLE tasks
+              ADD CONSTRAINT chk_task_order_positive
+              CHECK (order_index >= 0);

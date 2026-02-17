@@ -1,0 +1,17 @@
+databaseChangeLog:
+  - changeSet:
+      id: 013-task-phase-id-not-null.yaml
+      author: vivek
+      changes:
+
+        # Step 1: Remove any broken rows (tasks without phase)
+        - sql:
+            sql: >
+              DELETE FROM tasks
+              WHERE phase_id IS NULL;
+
+        # Step 2 — Enforce constraint
+        - addNotNullConstraint:
+            tableName: tasks
+            columnName: phase_id
+            columnDataType: VARCHAR(50)

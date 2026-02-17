@@ -1,6 +1,8 @@
 package com.letterfuture.execution.engine.workflow.engine;
 
+import com.letterfuture.execution.engine.enums.GoalStatus;
 import com.letterfuture.execution.engine.enums.TaskEventType;
+import com.letterfuture.execution.engine.workflow.domain.Goal;
 import com.letterfuture.execution.engine.workflow.domain.Phase;
 import com.letterfuture.execution.engine.workflow.domain.Task;
 import com.letterfuture.execution.engine.enums.TaskStatus;
@@ -9,14 +11,14 @@ import com.letterfuture.execution.engine.workflow.repository.GoalRepository;
 import com.letterfuture.execution.engine.workflow.repository.PhaseRepository;
 import com.letterfuture.execution.engine.workflow.repository.TaskEventRepository;
 import com.letterfuture.execution.engine.workflow.repository.TaskRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.util.Comparator;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -27,12 +29,19 @@ public class WorkflowEngine {
     private final PhaseRepository phaseRepo;
     private final GoalRepository goalRepo;
     private final TaskEventRepository eventRepo;
+    private static final Logger log =
+            LoggerFactory.getLogger(WorkflowEngine.class);
+
 
     @Transactional
-    public void completeTask(UUID taskId) {
+    public void completeTask(UUID taskId, UUID userId){
 
-        Task task = taskRepo.findById(taskId)
+        Task task = taskRepo.findByIdAndUser(taskId, userId)
                 .orElseThrow();
+
+        if(task.getStatus() == TaskStatus.COMPLETED){
+            return; // idempotent
+        }
 
         validateTransition(task, TaskStatus.COMPLETED);
 
@@ -44,19 +53,74 @@ public class WorkflowEngine {
         unlockNextTask(task);
 
         checkPhaseCompletion(task.getPhaseId());
+
+        log.info("Task {} completed", taskId);
     }
 
-    private void validateTransition(Task task, TaskStatus target) {
+    @Transactional
+    public void pauseGoal(UUID goalId, UUID userId){
 
-        if (task.getStatus() == TaskStatus.LOCKED) {
-            throw new IllegalStateException("Locked task cannot transition");
+        Goal goal = goalRepo.findByIdAndUserId(goalId, userId)
+                .orElseThrow(() ->
+                        new RuntimeException("Goal not found"));
+
+
+        goal.setStatus(GoalStatus.PAUSED);
+
+        goalRepo.save(goal);
+    }
+
+    @Transactional
+    public void skipTask(UUID taskId, UUID userId){
+
+        Task task = taskRepo.findByIdAndUser(taskId, userId)
+                .orElseThrow();
+
+        validateTransition(task, TaskStatus.SKIPPED);
+
+        task.setStatus(TaskStatus.SKIPPED);
+        taskRepo.save(task);
+
+        logEvent(taskId, TaskEventType.SKIPPED);
+
+        unlockNextTask(task);
+
+        checkPhaseCompletion(task.getPhaseId());
+    }
+
+    @Transactional
+    public void reopenTask(UUID taskId, UUID userId){
+
+        Task task = taskRepo.findByIdAndUser(taskId, userId)
+                .orElseThrow();
+
+        if(task.getStatus() == TaskStatus.LOCKED){
+            throw new IllegalStateException("Cannot reopen a locked task");
         }
 
-        if (task.getStatus() == TaskStatus.COMPLETED
-                && target == TaskStatus.COMPLETED) {
+        task.setStatus(TaskStatus.AVAILABLE);
+        taskRepo.save(task);
+
+        logEvent(taskId, TaskEventType.REOPENED);
+    }
+
+    private void validateTransition(Task task, TaskStatus target){
+
+        TaskStatus current = task.getStatus();
+
+        if(current == TaskStatus.LOCKED){
+            throw new IllegalStateException("Locked tasks cannot transition");
+        }
+
+        if(current == target){
             return;
         }
+
+        if(current == TaskStatus.COMPLETED && target == TaskStatus.SKIPPED){
+            throw new IllegalStateException("Completed task cannot be skipped");
+        }
     }
+
 
     private void unlockNextTask(Task completed) {
 
@@ -75,9 +139,8 @@ public class WorkflowEngine {
 
         List<Task> tasks = taskRepo.findAllByPhaseId(phaseId);
 
-        long completed = tasks.stream()
-                .filter(t -> t.getStatus() == TaskStatus.COMPLETED)
-                .count();
+        long completed = tasks.stream().filter(t -> t.getStatus() == TaskStatus.COMPLETED ||
+                t.getStatus() == TaskStatus.SKIPPED).count();
 
         double ratio = (double) completed / tasks.size();
 
@@ -117,30 +180,11 @@ public class WorkflowEngine {
         eventRepo.save(event);
     }
 
-
     @Transactional(readOnly = true)
-    public Task getNextTask(UUID goalId) {
-
-        List<Phase> phases = phaseRepo.findAll().stream()
-                .filter(p -> p.getGoalId().equals(goalId))
-                .sorted(Comparator.comparingInt(Phase::getOrderIndex))
-                .toList();
-
-        for (Phase phase : phases) {
-
-            Optional<Task> task =
-                    taskRepo.findFirstByPhaseIdAndStatusOrderByOrderIndex(
-                            phase.getId(),
-                            TaskStatus.AVAILABLE
-                    );
-
-            if (task.isPresent())
-                return task.get();
-        }
-
-        throw new RuntimeException("No available tasks");
+    public Task getNextTask(UUID goalId, UUID userId){
+        return taskRepo.findNextTask(goalId)
+                .orElseThrow(() -> new RuntimeException("No available tasks"));
     }
-
 
 }
 
