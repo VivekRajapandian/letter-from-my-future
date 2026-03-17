@@ -13,3 +13,32 @@ databaseChangeLog:
       file: db/changelog/006-task-events.yaml
   - include:
       file: db/changelog/007-plan-versions.yaml
+  - include:
+      file: db/changelog/008-task-availability-index.yaml
+  - include:
+      file: db/changelog/009-goal-last-activity.yaml
+  - include:
+      file: db/changelog/010-task-version.yaml
+  - include:
+      file: db/changelog/011-phase-goal-index.yaml
+  - include:
+      file: db/changelog/012-task-status-not-null.yaml
+  - include:
+      file: db/changelog/013-task-phase-id-not-null.yaml
+  - include:
+        file: db/changelog/014-goal-status-activity-index.yaml
+  - include:
+        file: db/changelog/015-plan-json-check.yaml
+  - include:
+        file: db/changelog/016-order-index-checks.yaml
+  - include:
+        file: db/changelog/017-add-timestamps.yaml
+  - include:
+        file: db/changelog/018-add-external-id.yaml
+  - include:
+        file: db/changelog/019-task-goal-status-index.yaml
+  - include:
+        file: db/changelog/020-users-auth-fields.yaml
+  - include:
+        file: db/changelog/021-refresh-tokens.yaml
+

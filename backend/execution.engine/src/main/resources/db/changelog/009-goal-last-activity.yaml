@@ -1,0 +1,17 @@
+databaseChangeLog:
+  - changeSet:
+      id: 009-goal-last-activity
+      author: vivek
+      changes:
+        - addColumn:
+            tableName: goals
+            columns:
+              - column:
+                  name: last_activity_at
+                  type: TIMESTAMP
+        - createIndex:
+            tableName: goals
+            indexName: idx_goal_activity
+            columns:
+              - column:
+                  name: last_activity_at

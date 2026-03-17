@@ -1,21 +1,28 @@
 spring:
   application:
     name: execution.engine
-  datasource:
-    url: jdbc:postgresql://localhost:5432/execution_engine
-    username: execution_user
-    password: StrongPassword123!
 
-    jpa:
+  transaction:
+    default-timeout: 5 # seconds
+
+  jpa:
+    hibernate:
+      ddl-auto: validate  # NEVER use update/create
+    properties:
       hibernate:
-        ddl-auto: validate   # NEVER use update/create
-      properties:
-        hibernate:
-          format_sql: true
-      open-in-view: false
+        format_sql: true
+    open-in-view: false
 
-    liquibase:
-      change-log: classpath:db/changelog/db.changelog-master.yaml
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.yaml
 
 server:
   port: 8080
+  tomcat:
+    connection-timeout: 5s # seconds
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:my-dev-secret-my-dev-secret-my-dev-secret-123456}
+    access-token-expiration-minutes: 60
+    refresh-token-expiration-days: 30

@@ -4,6 +4,7 @@ import com.letterfuture.execution.engine.enums.TaskStatus;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -18,17 +19,26 @@ public class Task {
     @Id
     private UUID id;
 
+    @Column(nullable = false)
     private UUID phaseId;
 
     private String title;
 
     private String description;
 
+    @Column(nullable = false)
     @Enumerated(EnumType.STRING)
     private TaskStatus status;
 
     private Integer orderIndex;
 
     private LocalDateTime createdAt;
+
+    @Version
+    private Long version;
+
+    @UpdateTimestamp
+    private LocalDateTime updatedAt;
+
 }
 

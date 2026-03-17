@@ -1,0 +1,14 @@
+databaseChangeLog:
+  - changeSet:
+      id: 019-task-goal-status-index
+      author: vivek
+      changes:
+
+        - createIndex:
+            tableName: tasks
+            indexName: idx_task_goal_status
+            columns:
+              - column:
+                  name: phase_id
+              - column:
+                  name: status

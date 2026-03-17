@@ -1,22 +1,25 @@
 package com.letterfuture.execution.engine.workflow.engine;
 
+import com.letterfuture.execution.engine.enums.GoalStatus;
 import com.letterfuture.execution.engine.enums.TaskEventType;
+import com.letterfuture.execution.engine.workflow.domain.Goal;
 import com.letterfuture.execution.engine.workflow.domain.Phase;
 import com.letterfuture.execution.engine.workflow.domain.Task;
 import com.letterfuture.execution.engine.enums.TaskStatus;
 import com.letterfuture.execution.engine.workflow.domain.TaskEvent;
+import com.letterfuture.execution.engine.workflow.dto.NextTaskResponse;
 import com.letterfuture.execution.engine.workflow.repository.GoalRepository;
 import com.letterfuture.execution.engine.workflow.repository.PhaseRepository;
 import com.letterfuture.execution.engine.workflow.repository.TaskEventRepository;
 import com.letterfuture.execution.engine.workflow.repository.TaskRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.util.Comparator;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -27,12 +30,19 @@ public class WorkflowEngine {
     private final PhaseRepository phaseRepo;
     private final GoalRepository goalRepo;
     private final TaskEventRepository eventRepo;
+    private static final Logger log =
+            LoggerFactory.getLogger(WorkflowEngine.class);
+
 
     @Transactional
-    public void completeTask(UUID taskId) {
+    public void completeTask(UUID taskId, UUID userId){
 
-        Task task = taskRepo.findById(taskId)
+        Task task = taskRepo.findByIdAndUser(taskId, userId)
                 .orElseThrow();
+
+        if(task.getStatus() == TaskStatus.COMPLETED){
+            return; // idempotent
+        }
 
         validateTransition(task, TaskStatus.COMPLETED);
 
@@ -44,19 +54,74 @@ public class WorkflowEngine {
         unlockNextTask(task);
 
         checkPhaseCompletion(task.getPhaseId());
+
+        log.info("Task {} completed", taskId);
     }
 
-    private void validateTransition(Task task, TaskStatus target) {
+    @Transactional
+    public void pauseGoal(UUID goalId, UUID userId){
 
-        if (task.getStatus() == TaskStatus.LOCKED) {
-            throw new IllegalStateException("Locked task cannot transition");
+        Goal goal = goalRepo.findByIdAndUserId(goalId, userId)
+                .orElseThrow(() ->
+                        new RuntimeException("Goal not found"));
+
+
+        goal.setStatus(GoalStatus.PAUSED);
+
+        goalRepo.save(goal);
+    }
+
+    @Transactional
+    public void skipTask(UUID taskId, UUID userId){
+
+        Task task = taskRepo.findByIdAndUser(taskId, userId)
+                .orElseThrow();
+
+        validateTransition(task, TaskStatus.SKIPPED);
+
+        task.setStatus(TaskStatus.SKIPPED);
+        taskRepo.save(task);
+
+        logEvent(taskId, TaskEventType.SKIPPED);
+
+        unlockNextTask(task);
+
+        checkPhaseCompletion(task.getPhaseId());
+    }
+
+    @Transactional
+    public void reopenTask(UUID taskId, UUID userId){
+
+        Task task = taskRepo.findByIdAndUser(taskId, userId)
+                .orElseThrow();
+
+        if(task.getStatus() == TaskStatus.LOCKED){
+            throw new IllegalStateException("Cannot reopen a locked task");
         }
 
-        if (task.getStatus() == TaskStatus.COMPLETED
-                && target == TaskStatus.COMPLETED) {
+        task.setStatus(TaskStatus.AVAILABLE);
+        taskRepo.save(task);
+
+        logEvent(taskId, TaskEventType.REOPENED);
+    }
+
+    private void validateTransition(Task task, TaskStatus target){
+
+        TaskStatus current = task.getStatus();
+
+        if(current == TaskStatus.LOCKED){
+            throw new IllegalStateException("Locked tasks cannot transition");
+        }
+
+        if(current == target){
             return;
         }
+
+        if(current == TaskStatus.COMPLETED && target == TaskStatus.SKIPPED){
+            throw new IllegalStateException("Completed task cannot be skipped");
+        }
     }
+
 
     private void unlockNextTask(Task completed) {
 
@@ -75,9 +140,8 @@ public class WorkflowEngine {
 
         List<Task> tasks = taskRepo.findAllByPhaseId(phaseId);
 
-        long completed = tasks.stream()
-                .filter(t -> t.getStatus() == TaskStatus.COMPLETED)
-                .count();
+        long completed = tasks.stream().filter(t -> t.getStatus() == TaskStatus.COMPLETED ||
+                t.getStatus() == TaskStatus.SKIPPED).count();
 
         double ratio = (double) completed / tasks.size();
 
@@ -117,30 +181,75 @@ public class WorkflowEngine {
         eventRepo.save(event);
     }
 
-
     @Transactional(readOnly = true)
-    public Task getNextTask(UUID goalId) {
+    public NextTaskResponse getNextTask(UUID goalId, UUID userId){
 
-        List<Phase> phases = phaseRepo.findAll().stream()
-                .filter(p -> p.getGoalId().equals(goalId))
-                .sorted(Comparator.comparingInt(Phase::getOrderIndex))
-                .toList();
+        List<Object[]> result =
+                taskRepo.findNextTaskWithContext(goalId, userId);
 
-        for (Phase phase : phases) {
-
-            Optional<Task> task =
-                    taskRepo.findFirstByPhaseIdAndStatusOrderByOrderIndex(
-                            phase.getId(),
-                            TaskStatus.AVAILABLE
-                    );
-
-            if (task.isPresent())
-                return task.get();
+        if(result.isEmpty()){
+            throw new RuntimeException("No available tasks");
         }
 
-        throw new RuntimeException("No available tasks");
+        Object[] row = result.get(0);
+
+        Task task = (Task) row[0];
+        Phase phase = (Phase) row[1];
+        Goal goal = (Goal) row[2];
+
+        int totalTasks = taskRepo.countTotalTasks(goalId);
+        int completedTasks = taskRepo.countCompletedTasks(goalId);
+
+        int taskCountInPhase =
+                taskRepo.countTasksInPhase(phase.getId());
+
+        int phaseCount =
+                phaseRepo.countByGoalId(goalId);
+
+        return new NextTaskResponse(
+                task.getId(),
+                task.getTitle(),
+                task.getDescription(),
+                goal.getTitle(),
+                phase.getTitle(),
+                phase.getOrderIndex(),
+                phaseCount,
+                task.getOrderIndex(),
+                taskCountInPhase,
+                completedTasks
+        );
     }
 
+    @Transactional(readOnly = true)
+    public long getTotalTasks(UUID goalId, UUID userId){
+        return taskRepo.countTotalTasks(goalId, userId);
+    }
+
+    @Transactional(readOnly = true)
+    public long getCompletedTasks(UUID goalId, UUID userId){
+        return taskRepo.countCompletedTasks(goalId, userId);
+    }
+
+    @Transactional
+    public void resumeTask(UUID taskId, UUID userId){
+
+        Task task = taskRepo.findByIdAndUser(taskId, userId)
+                .orElseThrow(() ->
+                        new RuntimeException("Task not found"));
+
+        if(task.getStatus() == TaskStatus.LOCKED){
+            throw new IllegalStateException("Locked task cannot be resumed");
+        }
+
+        if(task.getStatus() == TaskStatus.AVAILABLE){
+            return; // idempotent
+        }
+
+        task.setStatus(TaskStatus.AVAILABLE);
+        taskRepo.save(task);
+
+        logEvent(taskId, TaskEventType.REOPENED);
+    }
 
 }
 

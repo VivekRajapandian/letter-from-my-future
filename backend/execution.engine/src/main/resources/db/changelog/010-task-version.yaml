@@ -1,0 +1,14 @@
+databaseChangeLog:
+  - changeSet:
+      id: 010-task-version
+      author: vivek
+      changes:
+        - addColumn:
+            tableName: tasks
+            columns:
+              - column:
+                  name: version
+                  type: BIGINT
+                  defaultValue: 0
+                  constraints:
+                    nullable: false

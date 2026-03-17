@@ -1,9 +1,11 @@
 package com.letterfuture.execution.engine.workflow.domain;
 
 import com.letterfuture.execution.engine.enums.TaskEventType;
+import com.vladmihalcea.hibernate.type.json.JsonBinaryType;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.Type;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -26,6 +28,7 @@ public class TaskEvent {
     @Enumerated(EnumType.STRING)
     private TaskEventType eventType;
 
+    @Type(JsonBinaryType.class)
     @Column(columnDefinition = "jsonb")
     private String metadata;
 

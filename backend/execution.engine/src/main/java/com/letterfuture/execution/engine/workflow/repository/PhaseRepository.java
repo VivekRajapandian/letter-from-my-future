@@ -5,4 +5,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.UUID;
 
-public interface PhaseRepository extends JpaRepository<Phase, UUID> {}
+public interface PhaseRepository extends JpaRepository<Phase, UUID> {
+    int countByGoalId(UUID goalId);
+}
