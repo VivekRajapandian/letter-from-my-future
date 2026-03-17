@@ -7,6 +7,7 @@ import com.letterfuture.execution.engine.workflow.domain.Phase;
 import com.letterfuture.execution.engine.workflow.domain.Task;
 import com.letterfuture.execution.engine.enums.TaskStatus;
 import com.letterfuture.execution.engine.workflow.domain.TaskEvent;
+import com.letterfuture.execution.engine.workflow.dto.NextTaskResponse;
 import com.letterfuture.execution.engine.workflow.repository.GoalRepository;
 import com.letterfuture.execution.engine.workflow.repository.PhaseRepository;
 import com.letterfuture.execution.engine.workflow.repository.TaskEventRepository;
@@ -181,9 +182,73 @@ public class WorkflowEngine {
     }
 
     @Transactional(readOnly = true)
-    public Task getNextTask(UUID goalId, UUID userId){
-        return taskRepo.findNextTask(goalId)
-                .orElseThrow(() -> new RuntimeException("No available tasks"));
+    public NextTaskResponse getNextTask(UUID goalId, UUID userId){
+
+        List<Object[]> result =
+                taskRepo.findNextTaskWithContext(goalId, userId);
+
+        if(result.isEmpty()){
+            throw new RuntimeException("No available tasks");
+        }
+
+        Object[] row = result.get(0);
+
+        Task task = (Task) row[0];
+        Phase phase = (Phase) row[1];
+        Goal goal = (Goal) row[2];
+
+        int totalTasks = taskRepo.countTotalTasks(goalId);
+        int completedTasks = taskRepo.countCompletedTasks(goalId);
+
+        int taskCountInPhase =
+                taskRepo.countTasksInPhase(phase.getId());
+
+        int phaseCount =
+                phaseRepo.countByGoalId(goalId);
+
+        return new NextTaskResponse(
+                task.getId(),
+                task.getTitle(),
+                task.getDescription(),
+                goal.getTitle(),
+                phase.getTitle(),
+                phase.getOrderIndex(),
+                phaseCount,
+                task.getOrderIndex(),
+                taskCountInPhase,
+                completedTasks
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public long getTotalTasks(UUID goalId, UUID userId){
+        return taskRepo.countTotalTasks(goalId, userId);
+    }
+
+    @Transactional(readOnly = true)
+    public long getCompletedTasks(UUID goalId, UUID userId){
+        return taskRepo.countCompletedTasks(goalId, userId);
+    }
+
+    @Transactional
+    public void resumeTask(UUID taskId, UUID userId){
+
+        Task task = taskRepo.findByIdAndUser(taskId, userId)
+                .orElseThrow(() ->
+                        new RuntimeException("Task not found"));
+
+        if(task.getStatus() == TaskStatus.LOCKED){
+            throw new IllegalStateException("Locked task cannot be resumed");
+        }
+
+        if(task.getStatus() == TaskStatus.AVAILABLE){
+            return; // idempotent
+        }
+
+        task.setStatus(TaskStatus.AVAILABLE);
+        taskRepo.save(task);
+
+        logEvent(taskId, TaskEventType.REOPENED);
     }
 
 }

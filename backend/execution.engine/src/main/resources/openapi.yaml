@@ -1,0 +1,158 @@
+openapi: 3.0.3
+info:
+  title: Letter From My Future - Execution Engine API
+  version: 1.0.0
+  description: Minimal execution engine API for deterministic goal workflows.
+
+servers:
+  - url: http://localhost:8080
+
+paths:
+
+  /goals:
+    post:
+      summary: Create goal from structured plan JSON
+      parameters:
+        - in: query
+          name: userId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: string
+              description: Raw structured LLM JSON plan
+      responses:
+        '200':
+          description: Goal created
+          content:
+            application/json:
+              schema:
+                type: string
+                format: uuid
+
+  /goals/{goalId}/next-task:
+    get:
+      summary: Get next executable task
+      parameters:
+        - in: path
+          name: goalId
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: userId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Next task
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NextTaskResponse'
+
+  /goals/{goalId}/pause:
+    post:
+      summary: Pause goal
+      parameters:
+        - in: path
+          name: goalId
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: userId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Goal paused
+
+  /tasks/{taskId}/complete:
+    post:
+      summary: Complete task
+      parameters:
+        - in: path
+          name: taskId
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: userId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Task completed
+
+  /tasks/{taskId}/skip:
+    post:
+      summary: Skip task
+      parameters:
+        - in: path
+          name: taskId
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: userId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Task skipped
+
+  /tasks/{taskId}/reopen:
+    post:
+      summary: Reopen task
+      parameters:
+        - in: path
+          name: taskId
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: userId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Task reopened
+
+components:
+  schemas:
+
+    NextTaskResponse:
+      type: object
+      properties:
+        taskId:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+      required:
+        - taskId
+        - title
+        - description

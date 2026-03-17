@@ -1,6 +1,7 @@
 package com.letterfuture.execution.engine.workflow.controller;
 
 import com.letterfuture.execution.engine.workflow.compiler.PlanCompiler;
+import com.letterfuture.execution.engine.workflow.compiler.StubPlanProvider;
 import com.letterfuture.execution.engine.workflow.domain.Task;
 import com.letterfuture.execution.engine.workflow.dto.NextTaskResponse;
 import com.letterfuture.execution.engine.workflow.engine.WorkflowEngine;
@@ -16,14 +17,15 @@ public class GoalController {
 
     private final PlanCompiler compiler;
     private final WorkflowEngine engine;
+    private final StubPlanProvider stubPlanProvider;
 
     // Create goal from LLM plan
     @PostMapping
     public UUID createGoal(
-            @RequestParam UUID userId,
-            @RequestBody String rawJson){
+            @RequestParam UUID userId){
+        String stubJson = stubPlanProvider.getStubPlan();
 
-        return compiler.compileAndCreateGoal(userId, rawJson);
+        return compiler.compileAndCreateGoal(userId, stubJson);
     }
 
     @GetMapping("/{goalId}/next-task")
@@ -31,13 +33,7 @@ public class GoalController {
             @PathVariable UUID goalId,
             @RequestParam UUID userId){
 
-        Task task = engine.getNextTask(goalId, userId);
-
-        return new NextTaskResponse(
-                task.getId(),
-                task.getTitle(),
-                task.getDescription()
-        );
+        return engine.getNextTask(goalId, userId);
     }
 
     @PostMapping("/{goalId}/{userId}/pause")

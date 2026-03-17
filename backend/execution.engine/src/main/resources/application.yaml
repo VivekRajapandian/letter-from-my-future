@@ -20,3 +20,9 @@ server:
   port: 8080
   tomcat:
     connection-timeout: 5s # seconds
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:my-dev-secret-my-dev-secret-my-dev-secret-123456}
+    access-token-expiration-minutes: 60
+    refresh-token-expiration-days: 30

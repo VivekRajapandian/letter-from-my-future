@@ -29,5 +29,29 @@ public class TaskController {
                        @PathVariable UUID userId){
         engine.reopenTask(taskId, userId);
     }
+
+    @GetMapping("/{goalId}/total-tasks")
+    public long totalTasks(
+            @PathVariable UUID goalId,
+            @RequestParam UUID userId){
+
+        return engine.getTotalTasks(goalId, userId);
+    }
+
+    @GetMapping("/{goalId}/completed-tasks")
+    public long completedTasks(
+            @PathVariable UUID goalId,
+            @RequestParam UUID userId){
+
+        return engine.getCompletedTasks(goalId, userId);
+    }
+
+    @PostMapping("/{taskId}/{userId}/resume")
+    public void resume(
+            @PathVariable UUID taskId,
+            @PathVariable UUID userId){
+
+        engine.resumeTask(taskId, userId);
+    }
 }
 

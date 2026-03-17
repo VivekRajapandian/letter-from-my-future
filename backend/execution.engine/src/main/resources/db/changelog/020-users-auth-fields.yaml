@@ -1,0 +1,83 @@
+databaseChangeLog:
+  - changeSet:
+      id: 020-users-auth-fields
+      author: vivek
+      changes:
+
+        - addColumn:
+            tableName: users
+            columns:
+              - column:
+                  name: username
+                  type: VARCHAR(100)
+
+              - column:
+                  name: password_hash
+                  type: VARCHAR(255)
+
+              - column:
+                  name: role
+                  type: VARCHAR(50)
+                  defaultValue: USER
+
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+
+              - column:
+                  name: is_active
+                  type: BOOLEAN
+                  defaultValueBoolean: true
+
+        - update:
+            tableName: users
+            columns:
+              - column:
+                  name: role
+                  value: USER
+            where: role IS NULL
+
+        - update:
+            tableName: users
+            columns:
+              - column:
+                  name: is_active
+                  valueBoolean: true
+            where: is_active IS NULL
+
+        - update:
+            tableName: users
+            columns:
+              - column:
+                  name: updated_at
+                  valueComputed: CURRENT_TIMESTAMP
+            where: updated_at IS NULL
+
+        - addNotNullConstraint:
+            tableName: users
+            columnName: role
+            columnDataType: VARCHAR(50)
+
+        - addNotNullConstraint:
+            tableName: users
+            columnName: is_active
+            columnDataType: BOOLEAN
+
+        - addNotNullConstraint:
+            tableName: users
+            columnName: updated_at
+            columnDataType: TIMESTAMP
+
+        - createIndex:
+            tableName: users
+            indexName: idx_users_username
+            columns:
+              - column:
+                  name: username
+
+        - createIndex:
+            tableName: users
+            indexName: idx_users_active
+            columns:
+              - column:
+                  name: is_active
