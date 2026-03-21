@@ -26,3 +26,12 @@ app:
     secret: ${JWT_SECRET:my-dev-secret-my-dev-secret-my-dev-secret-123456}
     access-token-expiration-minutes: 60
     refresh-token-expiration-days: 30
+
+openai:
+  base-url: ${OPENAI_BASE_URL:https://api.openai.com/v1}
+  api-key: ${OPENAI_API_KEY:}
+
+logging:
+  level:
+    root: INFO
+    com.letterfuture.execution.engine: DEBUG

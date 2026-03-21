@@ -16,9 +16,12 @@ export function apiFetch(path: string, init?: RequestInit) {
   });
 }
 
-export async function createGoal(userId: string) {
+export async function createGoal(userId: string, goalDescription: string) {
   const res = await apiFetch(`/goals?userId=${userId}`, {
     method: "POST",
+    body: JSON.stringify({
+      goalDescription,
+    }),
   });
 
   if (!res.ok) {

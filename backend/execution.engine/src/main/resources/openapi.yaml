@@ -19,13 +19,6 @@ paths:
           schema:
             type: string
             format: uuid
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: string
-              description: Raw structured LLM JSON plan
       responses:
         '200':
           description: Goal created

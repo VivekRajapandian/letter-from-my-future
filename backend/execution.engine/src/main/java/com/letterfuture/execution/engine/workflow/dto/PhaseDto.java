@@ -1,6 +1,7 @@
 package com.letterfuture.execution.engine.workflow.dto;
 
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import lombok.Getter;
@@ -15,6 +16,7 @@ public class PhaseDto {
     private String title;
 
     @Min(7) @Max(365)
+    @JsonAlias({"durationDays", "duration_days"})
     private int durationDays;
 
     @NotEmpty

@@ -3,7 +3,11 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createGoal } from "@/services/api";
-import { getCurrentUser, logoutUser } from "@/services/auth";
+import { getCurrentUser } from "@/services/auth";
+import {
+  validateGoal,
+  type GoalValidationResult,
+} from "@/lib/goal-validation";
 
 export default function AppPage() {
   const [goal, setGoal] = useState("");
@@ -11,6 +15,12 @@ export default function AppPage() {
   const [authLoading, setAuthLoading] = useState(true);
   const [username, setUsername] = useState("");
   const [userId, setUserId] = useState("");
+  const [goalValidation, setGoalValidation] = useState<GoalValidationResult>({
+    accepted: false,
+    code: "EMPTY",
+    message: "Enter a goal to continue.",
+  });
+  const [hasTriedSubmit, setHasTriedSubmit] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -34,23 +44,23 @@ export default function AppPage() {
       return;
     }
 
+    const validation = validateGoal(goal);
+    setGoalValidation(validation);
+    setHasTriedSubmit(true);
+
+    if (!validation.accepted) {
+      return;
+    }
+
     try {
       setLoading(true);
-      const goalId = await createGoal(userId);
+      const goalId = await createGoal(userId, validation.normalizedGoal);
       router.push(`/goal/${goalId}`);
     } catch (error) {
       console.error(error);
       alert("Failed to create goal");
     } finally {
       setLoading(false);
-    }
-  }
-
-  async function handleLogout() {
-    try {
-      await logoutUser();
-    } finally {
-      router.replace("/");
     }
   }
 
@@ -65,7 +75,7 @@ export default function AppPage() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-[#f5f1e8] px-6">
       <div className="w-full max-w-xl rounded-[2rem] border border-black/5 bg-white px-8 py-10 text-center shadow-[0_24px_80px_rgba(34,30,24,0.08)]">
-        <div className="flex items-start justify-between gap-4 text-left">
+        <div className="text-left">
           <div>
             <p className="text-sm uppercase tracking-[0.3em] text-[#8a7f70]">
               Letter from My Future
@@ -74,14 +84,6 @@ export default function AppPage() {
               What future are we building{username ? `, ${username}` : ""}?
             </h1>
           </div>
-
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="rounded-full border border-[#d9d0c4] px-4 py-2 text-sm text-[#5d5347] transition hover:bg-[#f8f4ec]"
-          >
-            Log out
-          </button>
         </div>
 
         <p className="mt-4 text-left text-[#6f6558]">
@@ -91,15 +93,36 @@ export default function AppPage() {
 
         <textarea
           value={goal}
-          onChange={(e) => setGoal(e.target.value)}
+          onChange={(e) => {
+            const nextGoal = e.target.value;
+            setGoal(nextGoal);
+
+            if (hasTriedSubmit || nextGoal.trim()) {
+              setGoalValidation(validateGoal(nextGoal));
+            }
+          }}
           placeholder="Describe your goal..."
-          className="mt-8 min-h-40 w-full rounded-[1.5rem] border border-[#e8e0d3] bg-[#fcfaf6] p-5 text-[#1f1a14] outline-none transition focus:border-[#b8aa98]"
+          aria-invalid={hasTriedSubmit && !goalValidation.accepted}
+          className={`mt-8 min-h-40 w-full rounded-[1.5rem] border bg-[#fcfaf6] p-5 text-[#1f1a14] outline-none transition focus:border-[#b8aa98] ${
+            hasTriedSubmit && !goalValidation.accepted
+              ? "border-[#d8b4a4] focus:border-[#c98d73]"
+              : "border-[#e8e0d3]"
+          }`}
           rows={5}
         />
 
+        {hasTriedSubmit && !goalValidation.accepted && (
+          <div className="mt-4 rounded-[1.25rem] bg-[#f8ede8] px-4 py-3 text-left text-sm text-[#8c4d35]">
+            <p>{goalValidation.message}</p>
+            {goalValidation.suggestion && (
+              <p className="mt-1 text-[#9c6249]">{goalValidation.suggestion}</p>
+            )}
+          </div>
+        )}
+
         <button
           onClick={handleGenerate}
-          disabled={!goal.trim() || loading || !userId}
+          disabled={loading || !userId}
           className="mt-6 w-full rounded-full bg-[#1f1a14] px-6 py-4 text-base font-medium text-[#f8f4ec] transition disabled:cursor-not-allowed disabled:opacity-40"
         >
           {loading ? "Generating..." : "Generate Plan"}
