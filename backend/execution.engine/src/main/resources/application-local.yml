@@ -3,3 +3,6 @@ spring:
     url: jdbc:postgresql://localhost:5432/execution_engine
     username: execution_user
     password: execution_pass
+
+openai:
+  api-key: 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

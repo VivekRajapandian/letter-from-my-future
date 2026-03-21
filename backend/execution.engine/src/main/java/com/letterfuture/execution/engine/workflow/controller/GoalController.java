@@ -1,11 +1,14 @@
 package com.letterfuture.execution.engine.workflow.controller;
 
 import com.letterfuture.execution.engine.workflow.compiler.PlanCompiler;
-import com.letterfuture.execution.engine.workflow.compiler.StubPlanProvider;
-import com.letterfuture.execution.engine.workflow.domain.Task;
+import com.letterfuture.execution.engine.workflow.dto.CreateGoalRequest;
 import com.letterfuture.execution.engine.workflow.dto.NextTaskResponse;
 import com.letterfuture.execution.engine.workflow.engine.WorkflowEngine;
+import com.letterfuture.execution.engine.workflow.llm.OpenAiPlanClient;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
@@ -15,17 +18,34 @@ import java.util.UUID;
 @RequestMapping("/goals")
 public class GoalController {
 
+    private static final int MAX_PLAN_GENERATION_RETRIES = 5;
+    private static final Logger log = LoggerFactory.getLogger(GoalController.class);
+
     private final PlanCompiler compiler;
     private final WorkflowEngine engine;
-    private final StubPlanProvider stubPlanProvider;
+    private final OpenAiPlanClient openAiPlanClient;
 
     // Create goal from LLM plan
     @PostMapping
     public UUID createGoal(
-            @RequestParam UUID userId){
-        String stubJson = stubPlanProvider.getStubPlan();
+            @RequestParam UUID userId,
+            @Valid @RequestBody CreateGoalRequest request){
+        int maxAttempts = MAX_PLAN_GENERATION_RETRIES + 1;
+        IllegalArgumentException lastValidationFailure = null;
 
-        return compiler.compileAndCreateGoal(userId, stubJson);
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            String llmResponseJson = openAiPlanClient.generateGoalPlan(request.getGoalDescription());
+
+            try {
+                return compiler.compileAndCreateGoal(userId, llmResponseJson);
+            } catch (IllegalArgumentException ex) {
+                lastValidationFailure = ex;
+                log.warn("Generated plan rejected for user {} on attempt {}/{}: {}",
+                        userId, attempt, maxAttempts, ex.getMessage());
+            }
+        }
+
+        throw lastValidationFailure;
     }
 
     @GetMapping("/{goalId}/next-task")

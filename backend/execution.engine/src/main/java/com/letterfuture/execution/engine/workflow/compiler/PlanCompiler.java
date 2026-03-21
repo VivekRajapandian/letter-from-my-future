@@ -1,6 +1,7 @@
 package com.letterfuture.execution.engine.workflow.compiler;
 
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.letterfuture.execution.engine.enums.GoalStatus;
 import com.letterfuture.execution.engine.enums.TaskStatus;
@@ -44,6 +45,7 @@ public class PlanCompiler {
         enforceStructuralRules(dto);
         PlanDto normalized = normalize(dto);
         enforceLimits(normalized);
+        String persistedPlanJson = serializePlan(normalized);
 
         // 1) Goal
         Goal goal = new Goal();
@@ -58,7 +60,7 @@ public class PlanCompiler {
         PlanVersion pv = new PlanVersion();
         pv.setId(UUID.randomUUID());
         pv.setGoalId(goal.getId());
-        pv.setPlanJson(rawPlanJson);
+        pv.setPlanJson(persistedPlanJson);
         pv.setCreatedAt(LocalDateTime.now());
         planVersionRepo.save(pv);
 
@@ -127,9 +129,49 @@ public class PlanCompiler {
 
     private PlanDto parseStrict(String rawJson) {
         try {
-            return objectMapper.readValue(rawJson, PlanDto.class);
+            JsonNode root = objectMapper.readTree(sanitizeRawJson(rawJson));
+            JsonNode planNode = extractPlanNode(root);
+
+            if (planNode.isTextual()) {
+                return objectMapper.readValue(planNode.asText(), PlanDto.class);
+            }
+
+            return objectMapper.treeToValue(planNode, PlanDto.class);
         } catch (Exception e) {
             throw new IllegalArgumentException("Invalid plan JSON (strict parse failed).", e);
+        }
+    }
+
+    private String sanitizeRawJson(String rawJson) {
+        String trimmed = rawJson == null ? "" : rawJson.trim();
+        if (trimmed.startsWith("{{")) {
+            return trimmed.substring(1);
+        }
+        return trimmed;
+    }
+
+    private JsonNode extractPlanNode(JsonNode root) {
+        if (!root.has("output")) {
+            return root;
+        }
+
+        for (JsonNode outputNode : root.path("output")) {
+            for (JsonNode contentNode : outputNode.path("content")) {
+                JsonNode textNode = contentNode.path("text");
+                if (textNode.isTextual()) {
+                    return textNode;
+                }
+            }
+        }
+
+        throw new IllegalArgumentException("LLM response is missing output[*].content[*].text");
+    }
+
+    private String serializePlan(PlanDto dto) {
+        try {
+            return objectMapper.writeValueAsString(dto);
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Failed to serialize normalized plan JSON.", e);
         }
     }
 
