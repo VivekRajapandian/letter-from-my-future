@@ -13,6 +13,8 @@ type AuthFormProps = {
   submitLabel: string;
   alternateLabel: string;
   alternateHref: string;
+  defaultUsername?: string;
+  defaultPassword?: string;
 };
 
 export default function AuthForm({
@@ -22,10 +24,12 @@ export default function AuthForm({
   submitLabel,
   alternateLabel,
   alternateHref,
+  defaultUsername = "",
+  defaultPassword = "",
 }: AuthFormProps) {
   const [email, setEmail] = useState("");
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
+  const [username, setUsername] = useState(defaultUsername);
+  const [password, setPassword] = useState(defaultPassword);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
