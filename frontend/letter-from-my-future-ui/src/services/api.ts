@@ -1,6 +1,6 @@
 import { getStoredAccessToken } from "@/services/auth-storage";
 
-export const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "/api";
+export const API_BASE ="http://localhost:8080";
 
 export function apiFetch(path: string, init?: RequestInit) {
   const token = getStoredAccessToken();
@@ -10,6 +10,7 @@ export function apiFetch(path: string, init?: RequestInit) {
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
+      "Accept": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(init?.headers ?? {}),
     },
@@ -79,4 +80,36 @@ export async function resumeGoal(goalId: string, userId: string) {
   if (!res.ok) {
     throw new Error("Failed to resume goal");
   }
+}
+
+export type GoalCardResponse = {
+  goalId: string;
+  title: string;
+  status: string;
+  progressPercent: number;
+  completedTasks: number;
+  totalTasks: number;
+  nextTaskTitle: string | null;
+  phaseName: string | null;
+  phaseIndex: number;
+  phaseCount: number;
+  targetDate: string | null;
+  updatedAt: string;
+};
+
+export type OngoingGoalsResponse = {
+  userId: string;
+  hasOngoingGoals: boolean;
+  goals: GoalCardResponse[];
+};
+
+export async function getOngoingGoals(
+  userName: string
+): Promise<Response> {
+
+  const response = await apiFetch(`/users/${userName}/goals/ongoing`, {
+    method: "GET"
+  });
+
+  return response;
 }

@@ -11,6 +11,8 @@ export default function LoginPage() {
       submitLabel="Sign in"
       alternateLabel="Create account"
       alternateHref="/register"
+      defaultUsername="demo"
+      defaultPassword="demo"
     />
   );
 }
