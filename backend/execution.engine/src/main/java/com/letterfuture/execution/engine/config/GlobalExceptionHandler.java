@@ -6,9 +6,20 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 //@RestControllerAdvice
+@RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<String> handleIllegalArgument(
+            IllegalArgumentException ex){
+
+        return ResponseEntity
+                .badRequest()
+                .body(ex.getMessage());
+    }
+
     //@ExceptionHandler(IllegalStateException.class)
+    @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<String> handleIllegalState(
             IllegalStateException ex){
 
@@ -18,6 +29,7 @@ public class GlobalExceptionHandler {
     }
 
     //@ExceptionHandler(RuntimeException.class)
+    @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<String> handleRuntime(
             RuntimeException ex){
 

@@ -7,8 +7,8 @@ import com.letterfuture.execution.engine.workflow.domain.Users;
 import com.letterfuture.execution.engine.workflow.dto.*;
 import com.letterfuture.execution.engine.workflow.repository.UserRepository;
 import com.letterfuture.execution.engine.workflow.repository.RefreshTokenRepository;
-import jakarta.transaction.Transactional;
-import lombok.RequiredArgsConstructor;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -60,6 +60,7 @@ public class AuthService {
         );
     }
 
+    @Transactional(readOnly = true)
     public LoginResponse login(LoginRequest request) {
         String usernameOrEmail = request.getUsernameOrEmail().trim().toLowerCase();
         String password = request.getPassword();
@@ -85,6 +86,7 @@ public class AuthService {
         );
     }
 
+    @Transactional(readOnly = true)
     public RefreshResponse refresh(String refreshToken) {
         // Validate the JWT refresh token
         UUID userId = jwtService.validateRefreshToken(refreshToken);
@@ -128,6 +130,7 @@ public class AuthService {
         return new LogoutResponse("Logged out successfully");
     }
 
+    @Transactional(readOnly = true)
     public MeResponse me(String accessToken) {
         return jwtService.getUserInfoFromAccessToken(accessToken);
     }
