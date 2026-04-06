@@ -20,7 +20,8 @@ public class CorsConfig {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOriginPatterns(List.of(
                 "http://localhost:3000",
-                "http://192.168.12.4:3000"
+                "http://192.168.12.4:3000",
+                "https://lfl.vrcodeforge.com"
         ));
         configuration.setAllowedMethods(List.of(
                 "GET",
