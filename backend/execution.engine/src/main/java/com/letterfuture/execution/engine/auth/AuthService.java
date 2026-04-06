@@ -7,6 +7,7 @@ import com.letterfuture.execution.engine.workflow.domain.Users;
 import com.letterfuture.execution.engine.workflow.dto.*;
 import com.letterfuture.execution.engine.workflow.repository.UserRepository;
 import com.letterfuture.execution.engine.workflow.repository.RefreshTokenRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.security.crypto.password.PasswordEncoder;
