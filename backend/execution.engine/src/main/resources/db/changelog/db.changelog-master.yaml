@@ -41,4 +41,6 @@ databaseChangeLog:
         file: db/changelog/020-users-auth-fields.yaml
   - include:
         file: db/changelog/021-refresh-tokens.yaml
+  - include:
+        file: db/changelog/022-goal-phase-task-v2.yaml
 

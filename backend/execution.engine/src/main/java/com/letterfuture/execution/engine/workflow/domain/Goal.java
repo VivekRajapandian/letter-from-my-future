@@ -27,6 +27,15 @@ public class Goal {
 
     private String title;
 
+    @Column(columnDefinition = "TEXT")
+    private String description;
+
+    @Column(columnDefinition = "TEXT")
+    private String summary;
+
+    @Column(name = "target_duration_days")
+    private Integer targetDurationDays;
+
     private LocalDate targetDate;
 
     private LocalDateTime createdAt;

@@ -34,10 +34,10 @@ public class GoalController {
         IllegalArgumentException lastValidationFailure = null;
 
         for (int attempt = 1; attempt <= maxAttempts; attempt++) {
-            String llmResponseJson = openAiPlanClient.generateGoalPlan(request.getGoalDescription());
+            String llmResponseJson = openAiPlanClient.generateInitialGoalPlan(request.getGoalDescription());
 
             try {
-                return compiler.compileAndCreateGoal(userId, llmResponseJson);
+                return compiler.compileAndCreateInitialGoal(userId, request.getGoalDescription(), llmResponseJson);
             } catch (IllegalArgumentException ex) {
                 lastValidationFailure = ex;
                 log.warn("Generated plan rejected for user {} on attempt {}/{}: {}",

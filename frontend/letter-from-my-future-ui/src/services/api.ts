@@ -42,6 +42,10 @@ export async function getNextTask(goalId: string, userId: string) {
   return res.json();
 }
 
+export async function getGoalSummary(goalId: string, userId: string) {
+  return apiFetch(`/goals/${goalId}/summary?userId=${userId}`);
+}
+
 export async function completeTask(taskId: string, userId: string) {
   const res = await apiFetch(`/tasks/${taskId}/${userId}/complete`, {
     method: "POST",

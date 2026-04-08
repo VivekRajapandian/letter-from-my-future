@@ -8,6 +8,7 @@ import com.letterfuture.execution.engine.workflow.domain.Task;
 import com.letterfuture.execution.engine.enums.TaskStatus;
 import com.letterfuture.execution.engine.workflow.domain.TaskEvent;
 import com.letterfuture.execution.engine.workflow.dto.NextTaskResponse;
+import com.letterfuture.execution.engine.workflow.engine.NextPhaseGenerationService;
 import com.letterfuture.execution.engine.workflow.repository.GoalRepository;
 import com.letterfuture.execution.engine.workflow.repository.PhaseRepository;
 import com.letterfuture.execution.engine.workflow.repository.TaskEventRepository;
@@ -21,6 +22,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -30,6 +32,7 @@ public class WorkflowEngine {
     private final PhaseRepository phaseRepo;
     private final GoalRepository goalRepo;
     private final TaskEventRepository eventRepo;
+    private final NextPhaseGenerationService nextPhaseGenerationService;
     private static final Logger log =
             LoggerFactory.getLogger(WorkflowEngine.class);
 
@@ -53,7 +56,7 @@ public class WorkflowEngine {
 
         unlockNextTask(task);
 
-        checkPhaseCompletion(task.getPhaseId());
+        checkPhaseCompletion(task);
 
         log.info("Task {} completed", taskId);
     }
@@ -86,7 +89,7 @@ public class WorkflowEngine {
 
         unlockNextTask(task);
 
-        checkPhaseCompletion(task.getPhaseId());
+        checkPhaseCompletion(task);
     }
 
     @Transactional
@@ -136,39 +139,98 @@ public class WorkflowEngine {
         });
     }
 
-    private void checkPhaseCompletion(UUID phaseId) {
+    private void checkPhaseCompletion(Task completedTask) {
+        Task lastTask = taskRepo.findFirstByPhaseIdOrderByOrderIndexDesc(completedTask.getPhaseId())
+                .orElseThrow(() -> new RuntimeException("Phase has no tasks"));
 
-        List<Task> tasks = taskRepo.findAllByPhaseId(phaseId);
+        if (!lastTask.getId().equals(completedTask.getId())) {
+            return;
+        }
 
-        long completed = tasks.stream().filter(t -> t.getStatus() == TaskStatus.COMPLETED ||
+        List<Task> tasks = taskRepo.findAllByPhaseId(completedTask.getPhaseId());
+        long completedCount = tasks.stream().filter(t -> t.getStatus() == TaskStatus.COMPLETED ||
                 t.getStatus() == TaskStatus.SKIPPED).count();
 
-        double ratio = (double) completed / tasks.size();
+        onPhaseReachedCompletion(completedTask.getPhaseId(), completedCount, tasks.size());
+    }
 
-        if (ratio >= 0.7) {
-            unlockNextPhase(phaseId);
+    private void onPhaseReachedCompletion(UUID phaseId, long completedCount, int totalCount) {
+        Phase phase = phaseRepo.findById(phaseId)
+                .orElseThrow(() -> new RuntimeException("Phase not found"));
+
+        log.info("Phase {} ('{}') reached completion threshold ({}/{}). Triggering next phase unlock.",
+                phaseId, phase.getTitle(), completedCount, totalCount);
+
+        logPhaseEventForAllTasks(phaseId, TaskEventType.PHASE_COMPLETED);
+        proceedToNextPhase(phaseId);
+    }
+
+    private void proceedToNextPhase(UUID phaseId) {
+        Phase currentPhase = phaseRepo.findById(phaseId)
+                .orElseThrow(() -> new RuntimeException("Phase not found"));
+
+        UUID goalId = currentPhase.getGoalId();
+        var nextPhaseOpt = phaseRepo.findByGoalIdAndOrderIndex(goalId, currentPhase.getOrderIndex() + 1);
+
+        if (nextPhaseOpt.isPresent()) {
+            Phase nextPhase = nextPhaseOpt.get();
+            log.info("Unlocking existing next phase {} ('{}') for goal {}.",
+                    nextPhase.getId(), nextPhase.getTitle(), goalId);
+            unlockPhaseFirstTask(nextPhase.getId(), TaskEventType.NEXT_PHASE_TRIGGERED);
+        } else {
+            log.info("No pre-planned next phase found for goal {}. Scheduling LLM-based next phase generation.",
+                    goalId);
+            try {
+                UUID nextPhaseId = nextPhaseGenerationService.generateNextPhaseForCompletedPhase(currentPhase);
+                logPhaseEventForGoal(goalId, TaskEventType.NEXT_PHASE_GENERATED);
+            } catch (Exception ex) {
+                log.error("Next phase generation failed for goal {}: {}",
+                        goalId, ex.getMessage(), ex);
+                // Do not mark goal as completed - let it remain active for retry
+                // The UI will show appropriate waiting state when no tasks are available
+            }
         }
     }
 
-    private void unlockNextPhase(UUID phaseId) {
+    private void markGoalAsCompleted(UUID goalId) {
+        Goal goal = goalRepo.findById(goalId)
+                .orElseThrow(() -> new RuntimeException("Goal not found"));
+        if (goal.getStatus() != GoalStatus.COMPLETED) {
+            goal.setStatus(GoalStatus.COMPLETED);
+            goalRepo.save(goal);
+            log.info("Goal {} marked as COMPLETED.", goalId);
+        }
+    }
 
-        Phase phase = phaseRepo.findById(phaseId).orElseThrow();
-
-        phaseRepo.findAll().stream()
-                .filter(p -> p.getGoalId().equals(phase.getGoalId()))
-                .filter(p -> p.getOrderIndex() == phase.getOrderIndex() + 1)
-                .findFirst()
-                .ifPresent(nextPhase -> {
-
-                    taskRepo.findFirstByPhaseIdAndStatusOrderByOrderIndex(
-                            nextPhase.getId(),
-                            TaskStatus.LOCKED
-                    ).ifPresent(first -> {
-                        first.setStatus(TaskStatus.AVAILABLE);
-                        taskRepo.save(first);
-                    });
+    private void unlockPhaseFirstTask(UUID phaseId, TaskEventType triggerEvent) {
+        taskRepo.findFirstByPhaseIdAndStatusOrderByOrderIndex(phaseId, TaskStatus.LOCKED)
+                .ifPresent(first -> {
+                    first.setStatus(TaskStatus.AVAILABLE);
+                    taskRepo.save(first);
+                    logEvent(first.getId(), triggerEvent);
+                    log.debug("Unlocked first task {} in phase {} via event {}.",
+                            first.getId(), phaseId, triggerEvent);
                 });
     }
+
+    private void logPhaseEventForAllTasks(UUID phaseId, TaskEventType eventType) {
+        List<Task> tasks = taskRepo.findAllByPhaseId(phaseId);
+        for (Task task : tasks) {
+            logEvent(task.getId(), eventType);
+        }
+    }
+
+    private void logPhaseEventForGoal(UUID goalId, TaskEventType eventType) {
+        List<Phase> phases = phaseRepo.findByGoalIdOrderByOrderIndex(goalId);
+        for (Phase phase : phases) {
+            List<Task> tasks = taskRepo.findAllByPhaseId(phase.getId());
+            for (Task task : tasks) {
+                logEvent(task.getId(), eventType);
+            }
+        }
+    }
+
+
 
     private void logEvent(UUID taskId, TaskEventType type) {
 
@@ -181,7 +243,7 @@ public class WorkflowEngine {
         eventRepo.save(event);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, noRollbackFor = RuntimeException.class)
     public NextTaskResponse getNextTask(UUID goalId, UUID userId){
 
         List<Object[]> result =
