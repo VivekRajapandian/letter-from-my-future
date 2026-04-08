@@ -1,0 +1,40 @@
+databaseChangeLog:
+  - changeSet:
+      id: 023-create-task-questions
+      author: vivek
+      changes:
+        - createTable:
+            tableName: task_questions
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  defaultValueComputed: uuid_generate_v4()
+                  constraints:
+                    primaryKey: true
+
+              - column:
+                  name: task_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: question_index
+                  type: INTEGER
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: question
+                  type: TEXT
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: question_type
+                  type: VARCHAR(50)
+
+              - column:
+                  name: hint
+                  type: TEXT

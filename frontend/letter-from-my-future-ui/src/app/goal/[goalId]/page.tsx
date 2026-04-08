@@ -9,10 +9,12 @@ import {
   skipTask,
   pauseGoal,
   resumeGoal,
+  submitTaskResponses,
 } from "@/services/api";
 import { getCurrentUser } from "@/services/auth";
 import GoalHeader from "@/components/GoalHeader";
 import TaskCard from "@/components/TaskCard";
+import TaskQuestions from "@/components/TaskQuestions";
 
 type Task = {
   taskId: string;
@@ -25,6 +27,17 @@ type Task = {
   taskIndex?: number;
   taskCount?: number;
   completedCount?: number;
+  questions?: Array<{
+    questionId: string;
+    questionIndex: number;
+    question: string;
+    questionType: string;
+    hint?: string;
+  }>;
+  responses?: Array<{
+    questionId: string;
+    response: string;
+  }>;
 };
 
 type GoalSummaryResponse = {
@@ -337,8 +350,8 @@ export default function GoalPage() {
         <GoalHeader
           goalTitle={task.goalTitle}
           phaseName={
-            task.phaseIndex && task.phaseCount
-              ? `Phase ${task.phaseIndex} of ${task.phaseCount} - ${task.phaseName}`
+            task.phaseIndex
+              ? `Phase ${task.phaseIndex} - ${task.phaseName}`
               : task.phaseName
           }
           taskIndex={task.taskIndex}
@@ -358,6 +371,20 @@ export default function GoalPage() {
           onComplete={handleComplete}
           onSkip={handleSkip}
         />
+
+        {task.questions && task.questions.length > 0 && (
+          <div className="w-full max-w-2xl">
+            <TaskQuestions
+              taskId={task.taskId}
+              questions={task.questions}
+              existingResponses={task.responses}
+              onResponsesSubmitted={() => {
+                // Optional: could refresh or show confirmation
+                console.log("Responses submitted successfully");
+              }}
+            />
+          </div>
+        )}
       </div>
     </main>
   );

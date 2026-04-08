@@ -10,6 +10,7 @@ import com.letterfuture.execution.engine.workflow.dto.InitialGoalPlanDto;
 import com.letterfuture.execution.engine.workflow.dto.InitialPhaseDto;
 import com.letterfuture.execution.engine.workflow.dto.PlanDto;
 import com.letterfuture.execution.engine.workflow.dto.PhaseDto;
+import com.letterfuture.execution.engine.workflow.dto.TaskQuestionInputDto;
 import com.letterfuture.execution.engine.workflow.domain.*;
 import com.letterfuture.execution.engine.workflow.repository.*;
 import jakarta.transaction.Transactional;
@@ -35,6 +36,7 @@ public class PlanCompiler {
     private final GoalRepository goalRepo;
     private final PhaseRepository phaseRepo;
     private final TaskRepository taskRepo;
+    private final TaskQuestionRepository taskQuestionRepo;
     private final PlanVersionRepository planVersionRepo;
 
     /**
@@ -164,6 +166,9 @@ public class PlanCompiler {
             }
 
             taskRepo.save(task);
+            
+            // Save task questions if provided
+            saveTaskQuestions(task.getId(), taskDto.getQuestions());
         }
 
         return goal.getId();
@@ -214,6 +219,9 @@ public class PlanCompiler {
             }
 
             taskRepo.save(task);
+            
+            // Save task questions if provided
+            saveTaskQuestions(task.getId(), taskDto.getQuestions());
         }
 
         PlanVersion pv = new PlanVersion();
@@ -477,6 +485,25 @@ public class PlanCompiler {
         int totalTasks = dto.getPhases().stream().mapToInt(p -> p.getTasks().size()).sum();
         if (totalTasks > MAX_TOTAL_TASKS) {
             throw new IllegalArgumentException("Plan too large: " + totalTasks + " tasks (max " + MAX_TOTAL_TASKS + ")");
+        }
+    }
+
+    private void saveTaskQuestions(UUID taskId, List<TaskQuestionInputDto> questions) {
+        if (questions == null || questions.isEmpty()) {
+            return;
+        }
+
+        for (int i = 0; i < questions.size(); i++) {
+            TaskQuestionInputDto questionDto = questions.get(i);
+            TaskQuestion question = new TaskQuestion();
+            question.setId(UUID.randomUUID());
+            question.setTaskId(taskId);
+            question.setQuestionIndex(i);
+            question.setQuestion(questionDto.getQuestion());
+            question.setQuestionType(questionDto.getType());
+            question.setHint(questionDto.getHint());
+
+            taskQuestionRepo.save(question);
         }
     }
 }

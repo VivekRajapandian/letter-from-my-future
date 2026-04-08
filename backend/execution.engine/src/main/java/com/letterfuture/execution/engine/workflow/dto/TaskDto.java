@@ -1,9 +1,11 @@
 package com.letterfuture.execution.engine.workflow.dto;
 
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import lombok.Getter;
 import lombok.Setter;
+import java.util.List;
 
 @Getter @Setter
 public class TaskDto {
@@ -17,4 +19,8 @@ public class TaskDto {
 
     @Min(1) @Max(3650)
     private int day;
+
+    @Valid
+    @Size(min = 0, max = 4)
+    private List<TaskQuestionInputDto> questions;
 }

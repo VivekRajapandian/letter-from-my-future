@@ -12,15 +12,15 @@ public class OpenAiPlanClient {
     private static final String GOAL_PLAN_PAYLOAD_TEMPLATE = """
             {
   "model": "gpt-4o-mini",
-  "messages": [
+  "input": [
     {
-      "role": "system",
+      "role": "developer",
       "content": "You are a planning engine for an execution app. Return only valid JSON matching the schema and satisfy every validation rule exactly. Create a complete, practical execution plan based on this goal description: %s. Hard requirements: the plan must contain exactly 5 phases; target_duration_days must be an integer between 30 and 3650; each phase must have duration_days between 7 and 365; each phase must include 1 to 8 tasks; every task title and description must be non-empty; every task day must be an integer between 1 and 3650; keep the response detailed and actionable; do not include any prose outside the JSON."
     }
   ],
-  "response_format": {
-    "type": "json_schema",
-    "json_schema": {
+  "text": {
+    "format": {
+      "type": "json_schema",
       "name": "goal_plan",
       "schema": {
         "type": "object",
@@ -84,8 +84,7 @@ public class OpenAiPlanClient {
           }
         },
         "required": ["goal_title", "target_duration_days", "phases"]
-      },
-      "strict": true
+      }
     }
   }
 }
@@ -94,15 +93,15 @@ public class OpenAiPlanClient {
     private static final String INITIAL_GOAL_PLAN_PAYLOAD_TEMPLATE = """
             {
   "model": "gpt-4o-mini",
-  "messages": [
+  "input": [
     {
-      "role": "system",
-      "content": "You are a planning engine for an execution app. Return only valid JSON matching the schema and satisfy every validation rule exactly. Generate an initial plan for this goal description: %s. The response must include a short goal interpretation, a total estimated journey outline, and only the first phase with tasks. Do not generate future phases yet. Hard requirements: goal_summary must be non-empty; target_duration_days must be an integer between 30 and 3650; the phase must have a title; duration_days must be an integer between 7 and 365; tasks must contain 1 to 8 items; every task title and description must be non-empty; every task day must be an integer between 1 and 3650; do not include any prose outside the JSON."
+      "role": "developer",
+      "content": "You are a planning engine for an execution app. Return only valid JSON matching the schema and satisfy every validation rule exactly. Generate an initial plan for this goal description: %s. The response must include a short goal interpretation, a total estimated journey outline, and only the first phase with tasks. For each task, provide 3-4 simple data collection questions that help track progress (e.g., current weight, completed reps, hours invested, completion status, etc). Do not generate future phases yet. Hard requirements: goal_summary must be non-empty; target_duration_days must be an integer between 30 and 3650; the phase must have a title; duration_days must be an integer between 7 and 365; tasks must contain 1 to 8 items; every task must have 3-4 questions; every question must be concise and answerable; every task title and description must be non-empty; every task day must be an integer between 1 and 3650; do not include any prose outside the JSON."
     }
   ],
-  "response_format": {
-    "type": "json_schema",
-    "json_schema": {
+  "text": {
+    "format": {
+      "type": "json_schema",
       "name": "initial_goal_plan",
       "schema": {
         "type": "object",
@@ -155,6 +154,29 @@ public class OpenAiPlanClient {
                       "type": "integer",
                       "minimum": 1,
                       "maximum": 3650
+                    },
+                    "questions": {
+                      "type": "array",
+                      "minItems": 3,
+                      "maxItems": 4,
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "question": {
+                            "type": "string",
+                            "minLength": 5
+                          },
+                          "type": {
+                            "type": "string",
+                            "enum": ["text", "number", "date", "boolean"]
+                          },
+                          "hint": {
+                            "type": "string"
+                          }
+                        },
+                        "required": ["question", "type", "hint"]
+                      }
                     }
                   },
                   "required": ["title", "description", "day"]
@@ -165,8 +187,7 @@ public class OpenAiPlanClient {
           }
         },
         "required": ["goal_title", "goal_summary", "target_duration_days", "phase"]
-      },
-      "strict": true
+      }
     }
   }
 }
@@ -178,17 +199,20 @@ public class OpenAiPlanClient {
   "messages": [
     {
       "role": "system",
-      "content": "You are a planning engine for an execution app. Return only valid JSON matching the schema and rules exactly. Generate the next phase for the goal '%s' based on the prior phase history:\\n%s\\nand the current progress:\\n%s\\nHard requirements: return only the next phase object under the field phase; phase.title must be non-empty; duration_days must be an integer between 7 and 365; tasks must contain 1 to 8 items; every task title and description must be non-empty; every task day must be an integer between 1 and 3650; do not include any prose outside the JSON."
+      "content": "You are a planning engine for an execution app. Return only valid JSON matching the schema and rules exactly. For the goal '%s' with this phase history:\\n%s\\nand current progress with user responses:\\n%s\\nDecide if another phase is needed. Consider the user's actual progress and responses when making this decision. If the goal appears complete based on the history and progress, return {\\"complete\\": true}. If another phase is needed, return {\\"complete\\": false, \\"phase\\": {...}} with the next phase details. For each task, provide 3-4 simple data collection questions that help track progress and are customized based on the user's previous responses. Hard requirements: if complete=true, do not include phase field; if complete=false, phase.title must be non-empty; duration_days must be an integer between 7 and 365; tasks must contain 1 to 8 items; every task must have 3-4 questions; every task title and description must be non-empty; every task day must be an integer between 1 and 3650; do not include any prose outside the JSON."
     }
   ],
-  "response_format": {
-    "type": "json_schema",
-    "json_schema": {
-      "name": "next_phase",
+  "text": {
+    "format": {
+      "type": "json_schema",
+      "name": "next_phase_decision",
       "schema": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
+          "complete": {
+            "type": "boolean"
+          },
           "phase": {
             "type": "object",
             "additionalProperties": false,
@@ -223,6 +247,29 @@ public class OpenAiPlanClient {
                       "type": "integer",
                       "minimum": 1,
                       "maximum": 3650
+                    },
+                    "questions": {
+                      "type": "array",
+                      "minItems": 3,
+                      "maxItems": 4,
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "question": {
+                            "type": "string",
+                            "minLength": 5
+                          },
+                          "type": {
+                            "type": "string",
+                            "enum": ["text", "number", "date", "boolean"]
+                          },
+                          "hint": {
+                            "type": "string"
+                          }
+                        },
+                        "required": ["question", "type", "hint"]
+                      }
                     }
                   },
                   "required": ["title", "description", "day"]
@@ -232,9 +279,14 @@ public class OpenAiPlanClient {
             "required": ["title", "duration_days", "tasks"]
           }
         },
-        "required": ["phase"]
-      },
-      "strict": true
+        "required": ["complete"],
+        "if": {
+          "properties": { "complete": { "const": false } }
+        },
+        "then": {
+          "required": ["phase"]
+        }
+      }
     }
   }
 }
@@ -259,7 +311,7 @@ public class OpenAiPlanClient {
         String payload = buildGoalPlanPayload(goalDescription);
 
         String response = webClient.post()
-                .uri("/chat/completions")
+                .uri("/responses")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(payload)
@@ -282,7 +334,7 @@ public class OpenAiPlanClient {
         String payload = buildInitialGoalPlanPayload(goalDescription);
 
         String response = webClient.post()
-                .uri("/chat/completions")
+                .uri("/responses")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(payload)
@@ -307,7 +359,7 @@ public class OpenAiPlanClient {
         String payload = buildNextPhasePayload(goalTitle, priorPhasesSummary, progressSummary);
 
         String response = webClient.post()
-                .uri("/chat/completions")
+                .uri("/responses")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(payload)

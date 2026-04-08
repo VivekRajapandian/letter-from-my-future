@@ -7,12 +7,18 @@ import com.letterfuture.execution.engine.workflow.domain.Phase;
 import com.letterfuture.execution.engine.workflow.domain.Task;
 import com.letterfuture.execution.engine.enums.TaskStatus;
 import com.letterfuture.execution.engine.workflow.domain.TaskEvent;
+import com.letterfuture.execution.engine.workflow.domain.TaskQuestion;
+import com.letterfuture.execution.engine.workflow.domain.TaskResponse;
 import com.letterfuture.execution.engine.workflow.dto.NextTaskResponse;
+import com.letterfuture.execution.engine.workflow.dto.TaskQuestionDTO;
+import com.letterfuture.execution.engine.workflow.dto.TaskResponseDTO;
 import com.letterfuture.execution.engine.workflow.engine.NextPhaseGenerationService;
 import com.letterfuture.execution.engine.workflow.repository.GoalRepository;
 import com.letterfuture.execution.engine.workflow.repository.PhaseRepository;
 import com.letterfuture.execution.engine.workflow.repository.TaskEventRepository;
 import com.letterfuture.execution.engine.workflow.repository.TaskRepository;
+import com.letterfuture.execution.engine.workflow.repository.TaskQuestionRepository;
+import com.letterfuture.execution.engine.workflow.repository.TaskResponseRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,6 +38,8 @@ public class WorkflowEngine {
     private final PhaseRepository phaseRepo;
     private final GoalRepository goalRepo;
     private final TaskEventRepository eventRepo;
+    private final TaskQuestionRepository taskQuestionRepo;
+    private final TaskResponseRepository taskResponseRepo;
     private final NextPhaseGenerationService nextPhaseGenerationService;
     private static final Logger log =
             LoggerFactory.getLogger(WorkflowEngine.class);
@@ -181,8 +189,13 @@ public class WorkflowEngine {
             log.info("No pre-planned next phase found for goal {}. Scheduling LLM-based next phase generation.",
                     goalId);
             try {
-                UUID nextPhaseId = nextPhaseGenerationService.generateNextPhaseForCompletedPhase(currentPhase);
-                logPhaseEventForGoal(goalId, TaskEventType.NEXT_PHASE_GENERATED);
+                String nextPhaseJson = nextPhaseGenerationService.generateNextPhaseForCompletedPhase(currentPhase);
+                UUID nextPhaseId = nextPhaseGenerationService.processNextPhaseResponse(goalId, nextPhaseJson);
+                if (nextPhaseId != null) {
+                    logPhaseEventForGoal(goalId, TaskEventType.NEXT_PHASE_GENERATED);
+                } else {
+                    log.info("Goal {} determined to be complete by LLM - no next phase generated.", goalId);
+                }
             } catch (Exception ex) {
                 log.error("Next phase generation failed for goal {}: {}",
                         goalId, ex.getMessage(), ex);
@@ -268,6 +281,17 @@ public class WorkflowEngine {
         int phaseCount =
                 phaseRepo.countByGoalId(goalId);
 
+        // Load questions and responses for this task
+        List<TaskQuestion> questions = taskQuestionRepo.findByTaskIdOrderByQuestionIndex(task.getId());
+        List<TaskQuestionDTO> questionDTOs = questions.stream()
+                .map(q -> new TaskQuestionDTO(q.getId(), q.getQuestionIndex(), q.getQuestion(), q.getQuestionType(), q.getHint()))
+                .collect(Collectors.toList());
+
+        List<TaskResponse> responses = taskResponseRepo.findByTaskId(task.getId());
+        List<TaskResponseDTO> responseDTOs = responses.stream()
+                .map(r -> new TaskResponseDTO(r.getQuestionId(), r.getResponse()))
+                .collect(Collectors.toList());
+
         return new NextTaskResponse(
                 task.getId(),
                 task.getTitle(),
@@ -278,7 +302,9 @@ public class WorkflowEngine {
                 phaseCount,
                 task.getOrderIndex(),
                 taskCountInPhase,
-                completedTasks
+                completedTasks,
+                questionDTOs,
+                responseDTOs
         );
     }
 

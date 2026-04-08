@@ -43,4 +43,8 @@ databaseChangeLog:
         file: db/changelog/021-refresh-tokens.yaml
   - include:
         file: db/changelog/022-goal-phase-task-v2.yaml
+  - include:
+        file: db/changelog/023-task-questions.yaml
+  - include:
+        file: db/changelog/024-task-responses.yaml
 
