@@ -8,6 +8,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
+import java.util.List;
 
 @Getter
 @Setter
@@ -25,6 +26,14 @@ public class InitialGoalPlanDto {
     @Max(3650)
     @JsonAlias({"targetDurationDays", "target_duration_days"})
     private int targetDurationDays;
+
+    @Min(3)
+    @Max(5)
+    @JsonAlias({"totalPhases", "total_phases"})
+    private int totalPhases;
+
+    @JsonAlias({"phaseOutline", "phase_outline"})
+    private List<String> phaseOutline;
 
     @NotNull
     @Valid

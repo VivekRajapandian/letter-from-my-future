@@ -14,7 +14,6 @@ import {
 import { getCurrentUser } from "@/services/auth";
 import GoalHeader from "@/components/GoalHeader";
 import TaskCard from "@/components/TaskCard";
-import TaskQuestions from "@/components/TaskQuestions";
 
 type Task = {
   taskId: string;
@@ -342,6 +341,14 @@ export default function GoalPage() {
     );
   }
 
+  if (!task) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#FAFAFA]">
+        <p className="text-gray-400">Loading task...</p>
+      </div>
+    );
+  }
+
   return (
     <main className="min-h-screen bg-[#FAFAFA] relative overflow-hidden px-6 py-16 flex flex-col items-center">
       <div className="absolute inset-0 pointer-events-none opacity-5 bg-[radial-gradient(circle_at_1px_1px,_black_1px,_transparent_0)] [background-size:24px_24px]" />
@@ -370,21 +377,9 @@ export default function GoalPage() {
           loading={actionLoading}
           onComplete={handleComplete}
           onSkip={handleSkip}
+          questions={task.questions}
+          existingResponses={task.responses}
         />
-
-        {task.questions && task.questions.length > 0 && (
-          <div className="w-full max-w-2xl">
-            <TaskQuestions
-              taskId={task.taskId}
-              questions={task.questions}
-              existingResponses={task.responses}
-              onResponsesSubmitted={() => {
-                // Optional: could refresh or show confirmation
-                console.log("Responses submitted successfully");
-              }}
-            />
-          </div>
-        )}
       </div>
     </main>
   );

@@ -2,6 +2,7 @@ package com.letterfuture.execution.engine.workflow.engine;
 
 import com.letterfuture.execution.engine.enums.GoalStatus;
 import com.letterfuture.execution.engine.enums.TaskEventType;
+import com.letterfuture.execution.engine.enums.PhaseStatus;
 import com.letterfuture.execution.engine.workflow.domain.Goal;
 import com.letterfuture.execution.engine.workflow.domain.Phase;
 import com.letterfuture.execution.engine.workflow.domain.Task;
@@ -174,27 +175,29 @@ public class WorkflowEngine {
     }
 
     private void proceedToNextPhase(UUID phaseId) {
-        Phase currentPhase = phaseRepo.findById(phaseId)
+        Phase completedPhase = phaseRepo.findById(phaseId)
                 .orElseThrow(() -> new RuntimeException("Phase not found"));
 
-        UUID goalId = currentPhase.getGoalId();
-        var nextPhaseOpt = phaseRepo.findByGoalIdAndOrderIndex(goalId, currentPhase.getOrderIndex() + 1);
+        UUID goalId = completedPhase.getGoalId();
+        
+        // Check if there's a PLANNED phase (that was pre-created at goal initialization)
+        var nextPhaseOpt = phaseRepo.findFirstByGoalIdAndStatusOrderByOrderIndex(goalId, PhaseStatus.PLANNED);
 
         if (nextPhaseOpt.isPresent()) {
-            Phase nextPhase = nextPhaseOpt.get();
-            log.info("Unlocking existing next phase {} ('{}') for goal {}.",
-                    nextPhase.getId(), nextPhase.getTitle(), goalId);
-            unlockPhaseFirstTask(nextPhase.getId(), TaskEventType.NEXT_PHASE_TRIGGERED);
-        } else {
-            log.info("No pre-planned next phase found for goal {}. Scheduling LLM-based next phase generation.",
-                    goalId);
+            log.info("Next phase found. Generating detailed tasks for phase {} using LLM.",
+                    nextPhaseOpt.get().getOrderIndex() + 1);
             try {
-                String nextPhaseJson = nextPhaseGenerationService.generateNextPhaseForCompletedPhase(currentPhase);
+                String nextPhaseJson = nextPhaseGenerationService.generateNextPhaseForCompletedPhase(completedPhase);
                 UUID nextPhaseId = nextPhaseGenerationService.processNextPhaseResponse(goalId, nextPhaseJson);
                 if (nextPhaseId != null) {
+                    // Verify that the first task of the newly generated phase is available
+                    unlockPhaseFirstTask(nextPhaseId, TaskEventType.NEXT_PHASE_TRIGGERED);
                     logPhaseEventForGoal(goalId, TaskEventType.NEXT_PHASE_GENERATED);
+                    log.info("Phase {} generation and population completed for goal {}.",
+                            nextPhaseOpt.get().getOrderIndex() + 1, goalId);
                 } else {
-                    log.info("Goal {} determined to be complete by LLM - no next phase generated.", goalId);
+                    // This shouldn't happen with the pre-created phases approach
+                    log.warn("Phase generation returned null for goal {}", goalId);
                 }
             } catch (Exception ex) {
                 log.error("Next phase generation failed for goal {}: {}",
@@ -202,6 +205,10 @@ public class WorkflowEngine {
                 // Do not mark goal as completed - let it remain active for retry
                 // The UI will show appropriate waiting state when no tasks are available
             }
+        } else {
+            // No PENDING phase found - this must be the final phase
+            log.info("No pending phase found. Goal {} is complete.", goalId);
+            markGoalAsCompleted(goalId);
         }
     }
 

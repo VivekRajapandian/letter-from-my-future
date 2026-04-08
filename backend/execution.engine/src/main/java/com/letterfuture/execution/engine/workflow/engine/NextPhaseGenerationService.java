@@ -49,13 +49,20 @@ public class NextPhaseGenerationService {
 
         String priorPhaseSummary = buildPriorPhasesSummary(completedPhase.getGoalId(), completedPhase.getOrderIndex());
         String progressSummary = buildPhaseProgressSummary(completedPhase.getId());
+        
+        // Get phase information for context
+        int currentPhaseNumber = completedPhase.getOrderIndex() + 1; // Convert to 1-indexed for user
+        int nextPhaseNumber = currentPhaseNumber + 1;
+        long totalPhases = phaseRepo.countByGoalId(completedPhase.getGoalId());
 
-        log.info("Generating next phase for goal '{}' (id: {}) after phase '{}' completion.",
-                goal.getTitle(), goal.getId(), completedPhase.getTitle());
+        log.info("Generating next phase for goal '{}' (id: {}) - Phase {}/{} completed: '{}'",
+                goal.getTitle(), goal.getId(), currentPhaseNumber, totalPhases, completedPhase.getTitle());
 
         // Now suspend transaction and make LLM call
         String nextPhaseJson = openAiPlanClient.generateNextPhasePlan(
                 goal.getTitle(),
+                nextPhaseNumber,
+                (int) totalPhases,
                 priorPhaseSummary,
                 progressSummary);
 
@@ -65,6 +72,8 @@ public class NextPhaseGenerationService {
     @Transactional
     public UUID processNextPhaseResponse(UUID goalId, String nextPhaseJson) {
         try {
+            log.debug("Processing next phase response for goal {}: {}", goalId, nextPhaseJson);
+            
             JsonNode response = objectMapper.readTree(nextPhaseJson);
             boolean isComplete = response.path("complete").asBoolean(false);
 
@@ -77,18 +86,19 @@ public class NextPhaseGenerationService {
             // Extract phase from response and compile it
             if (response.has("phase")) {
                 String phaseJson = objectMapper.writeValueAsString(response.get("phase"));
-                List<Phase> phases = phaseRepo.findByGoalIdOrderByOrderIndex(goalId);
-                Phase lastPhase = phases.get(phases.size() - 1);
+                log.debug("Extracted phase JSON for goal {}: {}", goalId, phaseJson);
                 UUID nextPhaseId = planCompiler.compileAndAppendNextPhase(goalId, phaseJson);
                 log.info("Successfully generated and persisted next phase {} for goal {}.",
                         nextPhaseId, goalId);
                 return nextPhaseId;
             } else {
+                log.error("Response missing 'phase' field. Response: {}", nextPhaseJson);
                 throw new IllegalArgumentException("Expected phase field in response when complete=false");
             }
         } catch (Exception e) {
-            log.error("Failed to parse next phase response for goal {}: {}", goalId, e.getMessage());
-            throw new RuntimeException("Invalid next phase response format", e);
+            log.error("Failed to process next phase response for goal {}: {} - Response: {} ",
+                    goalId, e.getMessage(), nextPhaseJson, e);
+            throw new RuntimeException("Invalid next phase response format: " + e.getMessage(), e);
         }
     }
 

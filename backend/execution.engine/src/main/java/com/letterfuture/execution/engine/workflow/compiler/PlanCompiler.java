@@ -135,22 +135,37 @@ public class PlanCompiler {
         pv.setCreatedAt(LocalDateTime.now());
         planVersionRepo.save(pv);
 
-        Phase phase = new Phase();
-        phase.setId(UUID.randomUUID());
-        phase.setGoalId(goal.getId());
-        phase.setTitle(dto.getPhase().getTitle());
-        phase.setDurationDays(dto.getPhase().getDurationDays());
-        phase.setStatus(PhaseStatus.CURRENT);
-        phase.setOrderIndex(0);
-        phase.setCreatedAt(LocalDateTime.now());
-        phaseRepo.save(phase);
+        // Create all phases upfront based on phase_outline
+        UUID firstPhaseId = null;
+        for (int i = 0; i < dto.getPhaseOutline().size(); i++) {
+            Phase phase = new Phase();
+            phase.setId(UUID.randomUUID());
+            phase.setGoalId(goal.getId());
+            phase.setTitle(dto.getPhaseOutline().get(i));
+            phase.setStatus(i == 0 ? PhaseStatus.CURRENT : PhaseStatus.PLANNED);
+            phase.setOrderIndex(i);
+            phase.setCreatedAt(LocalDateTime.now());
+            // Duration will be set when we generate the detailed phase
+            phase.setDurationDays(0);
+            phaseRepo.save(phase);
+            
+            if (i == 0) {
+                firstPhaseId = phase.getId();
+            }
+        }
+
+        // Now populate the first phase with tasks from the detailed phase
+        Phase firstPhase = phaseRepo.findById(firstPhaseId)
+                .orElseThrow(() -> new RuntimeException("First phase not found"));
+        firstPhase.setDurationDays(dto.getPhase().getDurationDays());
+        phaseRepo.save(firstPhase);
 
         boolean firstTaskUnlocked = false;
         int taskIndex = 0;
         for (var taskDto : dto.getPhase().getTasks()) {
             Task task = new Task();
             task.setId(UUID.randomUUID());
-            task.setPhaseId(phase.getId());
+            task.setPhaseId(firstPhase.getId());
             task.setTitle(taskDto.getTitle());
             task.setDescription(taskDto.getDescription());
             task.setScheduledDay(taskDto.getDay());
@@ -183,21 +198,22 @@ public class PlanCompiler {
         enforceNextPhaseLimits(dto, goalId);
         String persistedPlanJson = serializePhase(dto);
 
+        // Mark current phase as completed
         Phase currentPhase = phaseRepo.findByGoalIdAndStatus(goalId, PhaseStatus.CURRENT)
                 .orElseThrow(() -> new IllegalStateException("Current phase not found for goal " + goalId));
         currentPhase.setStatus(PhaseStatus.COMPLETED);
         phaseRepo.save(currentPhase);
 
-        Phase nextPhase = new Phase();
-        nextPhase.setId(UUID.randomUUID());
-        nextPhase.setGoalId(goalId);
-        nextPhase.setTitle(dto.getTitle());
-        nextPhase.setDurationDays(dto.getDurationDays());
+        // Get the next PLANNED phase (should already exist from initialization)
+        Phase nextPhase = phaseRepo.findFirstByGoalIdAndStatusOrderByOrderIndex(goalId, PhaseStatus.PLANNED)
+                .orElseThrow(() -> new IllegalStateException("Next phase not found (should have been created at goal initialization)"));
+        
+        // Update the pending phase with details and mark as current
         nextPhase.setStatus(PhaseStatus.CURRENT);
-        nextPhase.setOrderIndex(currentPhase.getOrderIndex() + 1);
-        nextPhase.setCreatedAt(LocalDateTime.now());
+        nextPhase.setDurationDays(dto.getDurationDays());
         phaseRepo.save(nextPhase);
 
+        // Populate tasks for this phase
         boolean firstTaskUnlocked = false;
         int taskIndex = 0;
         for (var taskDto : dto.getTasks()) {
