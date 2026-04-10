@@ -1,27 +1,41 @@
 package com.letterfuture.execution.engine.workflow.execution;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.letterfuture.execution.engine.workflow.domain.Goal;
 import com.letterfuture.execution.engine.workflow.domain.Phase;
 import com.letterfuture.execution.engine.workflow.domain.Task;
+import com.letterfuture.execution.engine.workflow.domain.TaskInputDefinition;
+import com.letterfuture.execution.engine.workflow.domain.TaskSubmission;
+import com.letterfuture.execution.engine.workflow.domain.TaskSubmissionValue;
 import com.letterfuture.execution.engine.workflow.dto.execution.*;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-import java.util.List;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.*;
 
 @Component
+@RequiredArgsConstructor
 public class ExecutionSnapshotAssembler {
+
+    private final ObjectMapper objectMapper;
 
     public ExecutionSnapshotResponse toResponse(
             Goal goal,
             List<Phase> phases,
             Phase activePhase,
-            List<Task> tasks
+            List<Task> tasks,
+            Map<UUID, List<TaskInputDefinition>> inputDefinitionsByTaskId,
+            Map<UUID, TaskSubmission> latestSubmissionByTaskId,
+            Map<UUID, List<TaskSubmissionValue>> submissionValuesBySubmissionId
     ) {
         return new ExecutionSnapshotResponse(
                 toGoalDto(goal, phases),
                 toPlanningDto(goal, activePhase, tasks),
                 toActivePhaseDto(activePhase),
-                toTaskDtos(tasks),
+                toTaskDtos(tasks, inputDefinitionsByTaskId, latestSubmissionByTaskId, submissionValuesBySubmissionId),
                 toProgressDto(phases, tasks)
         );
     }
@@ -37,7 +51,7 @@ public class ExecutionSnapshotAssembler {
                 goal.getId(),
                 goal.getTitle(),
                 goal.getSummary(),
-                goal.getStatus().toString(),
+                goal.getStatus(),
                 goal.getPlanningMode(),
                 goal.getTargetDurationDays(),
                 phaseCountPlanned,
@@ -61,7 +75,7 @@ public class ExecutionSnapshotAssembler {
     }
 
     private String derivePlanningState(Goal goal, Phase activePhase, List<Task> tasks) {
-        if (equalsIgnoreCase(goal.getStatus().name(), "COMPLETED")) {
+        if (equalsIgnoreCase(goal.getStatus(), "COMPLETED")) {
             return "COMPLETED";
         }
 
@@ -102,24 +116,44 @@ public class ExecutionSnapshotAssembler {
         return new ExecutionPhaseDto(
                 activePhase.getId(),
                 activePhase.getTitle(),
-                activePhase.getStatus().toString(),
+                activephase.getStatus().toString(),
                 activePhase.getOrderIndex(),
                 activePhase.getDurationDays(),
                 activePhase.getTitle()
         );
     }
 
-    private List<ExecutionTaskDto> toTaskDtos(List<Task> tasks) {
+    private List<ExecutionTaskDto> toTaskDtos(
+            List<Task> tasks,
+            Map<UUID, List<TaskInputDefinition>> inputDefinitionsByTaskId,
+            Map<UUID, TaskSubmission> latestSubmissionByTaskId,
+            Map<UUID, List<TaskSubmissionValue>> submissionValuesBySubmissionId
+    ) {
         if (tasks == null || tasks.isEmpty()) {
             return List.of();
         }
 
         return tasks.stream()
-                .map(this::toTaskDto)
+                .map(task -> toTaskDto(
+                        task,
+                        inputDefinitionsByTaskId.getOrDefault(task.getId(), List.of()),
+                        latestSubmissionByTaskId.get(task.getId()),
+                        latestSubmissionByTaskId.get(task.getId()) == null
+                                ? List.of()
+                                : submissionValuesBySubmissionId.getOrDefault(
+                                latestSubmissionByTaskId.get(task.getId()).getId(),
+                                List.of()
+                        )
+                ))
                 .toList();
     }
 
-    private ExecutionTaskDto toTaskDto(Task task) {
+    private ExecutionTaskDto toTaskDto(
+            Task task,
+            List<TaskInputDefinition> inputDefinitions,
+            TaskSubmission latestSubmission,
+            List<TaskSubmissionValue> submissionValues
+    ) {
         return new ExecutionTaskDto(
                 task.getId(),
                 task.getTitle(),
@@ -132,9 +166,116 @@ public class ExecutionSnapshotAssembler {
                         task.getInstructionWhy(),
                         task.getSuccessCriteria()
                 ),
-                List.of(),
-                null
+                toInputSchemaDtos(inputDefinitions),
+                toLatestSubmissionDto(latestSubmission, inputDefinitions, submissionValues)
         );
+    }
+
+    private List<TaskInputDefinitionDto> toInputSchemaDtos(List<TaskInputDefinition> inputDefinitions) {
+        if (inputDefinitions == null || inputDefinitions.isEmpty()) {
+            return List.of();
+        }
+
+        return inputDefinitions.stream()
+                .map(this::toInputDefinitionDto)
+                .toList();
+    }
+
+    private TaskInputDefinitionDto toInputDefinitionDto(TaskInputDefinition input) {
+        return new TaskInputDefinitionDto(
+                input.getId(),
+                input.getKey(),
+                input.getLabel(),
+                input.getFieldType(),
+                input.getRequired(),
+                input.getPlaceholder(),
+                input.getHelpText(),
+                input.getUnit(),
+                parseSelectOptions(input.getOptionsJson())
+        );
+    }
+
+    private List<SelectOptionDto> parseSelectOptions(String optionsJson) {
+        if (optionsJson == null || optionsJson.isBlank()) {
+            return List.of();
+        }
+
+        try {
+            return objectMapper.readValue(
+                    optionsJson,
+                    new TypeReference<List<SelectOptionDto>>() {}
+            );
+        } catch (Exception e) {
+            return List.of();
+        }
+    }
+
+    private TaskLatestSubmissionDto toLatestSubmissionDto(
+            TaskSubmission latestSubmission,
+            List<TaskInputDefinition> inputDefinitions,
+            List<TaskSubmissionValue> submissionValues
+    ) {
+        if (latestSubmission == null) {
+            return null;
+        }
+
+        Map<UUID, TaskInputDefinition> inputDefinitionById = new HashMap<>();
+        for (TaskInputDefinition definition : inputDefinitions) {
+            inputDefinitionById.put(definition.getId(), definition);
+        }
+
+        Map<String, Object> valuesByInputKey = new LinkedHashMap<>();
+        for (TaskSubmissionValue submissionValue : submissionValues) {
+            TaskInputDefinition definition = inputDefinitionById.get(submissionValue.getInputDefinitionId());
+            if (definition == null) {
+                continue;
+            }
+
+            valuesByInputKey.put(
+                    definition.getKey(),
+                    extractValue(submissionValue)
+            );
+        }
+
+        return new TaskLatestSubmissionDto(
+                latestSubmission.getId(),
+                latestSubmission.getAction(),
+                latestSubmission.getSubmittedAt(),
+                latestSubmission.getNote(),
+                valuesByInputKey
+        );
+    }
+
+    private Object extractValue(TaskSubmissionValue value) {
+        if (value.getValueNumber() != null) {
+            BigDecimal number = value.getValueNumber();
+            return number.stripTrailingZeros().scale() <= 0
+                    ? number.intValue()
+                    : number.doubleValue();
+        }
+
+        if (value.getValueBoolean() != null) {
+            return value.getValueBoolean();
+        }
+
+        if (value.getValueDate() != null) {
+            LocalDate date = value.getValueDate();
+            return date.toString();
+        }
+
+        if (value.getValueText() != null) {
+            return value.getValueText();
+        }
+
+        if (value.getValueJson() != null && !value.getValueJson().isBlank()) {
+            try {
+                return objectMapper.readValue(value.getValueJson(), Object.class);
+            } catch (Exception e) {
+                return value.getValueJson();
+            }
+        }
+
+        return null;
     }
 
     private ExecutionProgressDto toProgressDto(List<Phase> phases, List<Task> tasks) {

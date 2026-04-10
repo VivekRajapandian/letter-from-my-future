@@ -3,17 +3,23 @@ package com.letterfuture.execution.engine.workflow.execution;
 import com.letterfuture.execution.engine.workflow.domain.Goal;
 import com.letterfuture.execution.engine.workflow.domain.Phase;
 import com.letterfuture.execution.engine.workflow.domain.Task;
+import com.letterfuture.execution.engine.workflow.domain.TaskInputDefinition;
+import com.letterfuture.execution.engine.workflow.domain.TaskSubmission;
+import com.letterfuture.execution.engine.workflow.domain.TaskSubmissionValue;
 import com.letterfuture.execution.engine.workflow.dto.execution.ExecutionSnapshotResponse;
 import com.letterfuture.execution.engine.workflow.repository.GoalRepository;
 import com.letterfuture.execution.engine.workflow.repository.PhaseRepository;
+import com.letterfuture.execution.engine.workflow.repository.TaskInputDefinitionRepository;
 import com.letterfuture.execution.engine.workflow.repository.TaskRepository;
+import com.letterfuture.execution.engine.workflow.repository.TaskSubmissionRepository;
+import com.letterfuture.execution.engine.workflow.repository.TaskSubmissionValueRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.util.Comparator;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import static org.springframework.http.HttpStatus.NOT_FOUND;
 
@@ -24,6 +30,9 @@ public class GoalExecutionQueryService {
     private final GoalRepository goalRepository;
     private final PhaseRepository phaseRepository;
     private final TaskRepository taskRepository;
+    private final TaskInputDefinitionRepository taskInputDefinitionRepository;
+    private final TaskSubmissionRepository taskSubmissionRepository;
+    private final TaskSubmissionValueRepository taskSubmissionValueRepository;
     private final ExecutionSnapshotAssembler executionSnapshotAssembler;
 
     public ExecutionSnapshotResponse getExecutionSnapshot(UUID goalId, UUID userId) {
@@ -41,7 +50,98 @@ public class GoalExecutionQueryService {
                 ? List.of()
                 : taskRepository.findByPhaseIdOrderByOrderIndexAsc(activePhase.getId());
 
-        return executionSnapshotAssembler.toResponse(goal, phases, activePhase, tasks);
+        List<UUID> taskIds = tasks.stream()
+                .map(Task::getId)
+                .toList();
+
+        Map<UUID, List<TaskInputDefinition>> inputDefinitionsByTaskId =
+                loadInputDefinitionsByTaskId(taskIds);
+
+        Map<UUID, TaskSubmission> latestSubmissionByTaskId =
+                loadLatestSubmissionByTaskId(taskIds);
+
+        Map<UUID, List<TaskSubmissionValue>> submissionValuesBySubmissionId =
+                loadSubmissionValuesBySubmissionId(latestSubmissionByTaskId.values());
+
+        return executionSnapshotAssembler.toResponse(
+                goal,
+                phases,
+                activePhase,
+                tasks,
+                inputDefinitionsByTaskId,
+                latestSubmissionByTaskId,
+                submissionValuesBySubmissionId
+        );
+    }
+
+    private Map<UUID, List<TaskInputDefinition>> loadInputDefinitionsByTaskId(List<UUID> taskIds) {
+        if (taskIds == null || taskIds.isEmpty()) {
+            return Map.of();
+        }
+
+        List<TaskInputDefinition> inputDefinitions =
+                taskInputDefinitionRepository.findByTaskIdIn(taskIds);
+
+        return inputDefinitions.stream()
+                .collect(Collectors.groupingBy(
+                        TaskInputDefinition::getTaskId,
+                        Collectors.collectingAndThen(Collectors.toList(), list ->
+                                list.stream()
+                                        .sorted(Comparator.comparing(
+                                                TaskInputDefinition::getOrderIndex,
+                                                Comparator.nullsLast(Integer::compareTo)
+                                        ))
+                                        .toList()
+                        )
+                ));
+    }
+
+    private Map<UUID, TaskSubmission> loadLatestSubmissionByTaskId(List<UUID> taskIds) {
+        if (taskIds == null || taskIds.isEmpty()) {
+            return Map.of();
+        }
+
+        List<TaskSubmission> submissions = taskSubmissionRepository.findByTaskIdIn(taskIds);
+
+        Map<UUID, TaskSubmission> latestByTaskId = new HashMap<>();
+
+        for (TaskSubmission submission : submissions) {
+            TaskSubmission existing = latestByTaskId.get(submission.getTaskId());
+
+            if (existing == null || isLater(submission, existing)) {
+                latestByTaskId.put(submission.getTaskId(), submission);
+            }
+        }
+
+        return latestByTaskId;
+    }
+
+    private Map<UUID, List<TaskSubmissionValue>> loadSubmissionValuesBySubmissionId(
+            Collection<TaskSubmission> submissions
+    ) {
+        if (submissions == null || submissions.isEmpty()) {
+            return Map.of();
+        }
+
+        List<UUID> submissionIds = submissions.stream()
+                .map(TaskSubmission::getId)
+                .toList();
+
+        List<TaskSubmissionValue> values =
+                taskSubmissionValueRepository.findBySubmissionIdIn(submissionIds);
+
+        return values.stream()
+                .collect(Collectors.groupingBy(TaskSubmissionValue::getSubmissionId));
+    }
+
+    private boolean isLater(TaskSubmission candidate, TaskSubmission current) {
+        if (candidate.getSubmittedAt() == null) {
+            return false;
+        }
+        if (current.getSubmittedAt() == null) {
+            return true;
+        }
+        return candidate.getSubmittedAt().isAfter(current.getSubmittedAt());
     }
 
     private Phase resolveActivePhase(List<Phase> phases) {
@@ -51,15 +151,21 @@ public class GoalExecutionQueryService {
 
         return phases.stream()
                 .filter(this::isActivePhase)
-                .min(Comparator.comparing(Phase::getOrderIndex, Comparator.nullsLast(Integer::compareTo)))
+                .min(Comparator.comparing(
+                        Phase::getOrderIndex,
+                        Comparator.nullsLast(Integer::compareTo)
+                ))
                 .orElseGet(() -> phases.stream()
                         .filter(this::isIncompletePhase)
-                        .min(Comparator.comparing(Phase::getOrderIndex, Comparator.nullsLast(Integer::compareTo)))
+                        .min(Comparator.comparing(
+                                Phase::getOrderIndex,
+                                Comparator.nullsLast(Integer::compareTo)
+                        ))
                         .orElse(null));
     }
 
     private boolean isActivePhase(Phase phase) {
-        return equalsIgnoreCase(phase.getStatus().toString(), "ACTIVE");
+        return equalsIgnoreCase(phase.getStatus().toString().toString(), "ACTIVE");
     }
 
     private boolean isIncompletePhase(Phase phase) {

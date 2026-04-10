@@ -1,301 +1,106 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import {
-  getNextTask,
-  getGoalSummary,
-  completeTask,
-  skipTask,
-  pauseGoal,
-  resumeGoal,
-  submitTaskResponses,
-} from "@/services/api";
+import GoalExecutionScreen from "@/components/execution/GoalExecutionScreen";
+import { getExecutionSnapshot } from "@/services/executionApi";
+import { ExecutionSnapshot } from "@/types/execution";
 import { getCurrentUser } from "@/services/auth";
-import GoalHeader from "@/components/GoalHeader";
-import TaskCard from "@/components/TaskCard";
-
-type Task = {
-  taskId: string;
-  title: string;
-  description: string;
-  goalTitle?: string;
-  phaseName?: string;
-  phaseIndex?: number;
-  phaseCount?: number;
-  taskIndex?: number;
-  taskCount?: number;
-  completedCount?: number;
-  questions?: Array<{
-    questionId: string;
-    questionIndex: number;
-    question: string;
-    questionType: string;
-    hint?: string;
-  }>;
-  responses?: Array<{
-    questionId: string;
-    response: string;
-  }>;
-};
-
-type GoalSummaryResponse = {
-  goalId: string;
-  title: string;
-  status: string;
-  targetDate: string | null;
-  completedTasks: number;
-  totalTasks: number;
-  progressPercent: number;
-  nextTask: Task | null;
-  updatedAt: string;
-};
 
 export default function GoalPage() {
   const params = useParams();
   const router = useRouter();
   const goalId = params?.goalId as string;
 
-  const [task, setTask] = useState<Task | null>(null);
+  const [snapshot, setSnapshot] = useState<ExecutionSnapshot | null>(null);
+  const [userId, setUserId] = useState<string>("");
   const [loading, setLoading] = useState(true);
-  const [actionLoading, setActionLoading] = useState(false);
-  const [finished, setFinished] = useState(false);
-  const [waitingForNextPhase, setWaitingForNextPhase] = useState(false);
-  const [paused, setPaused] = useState(false);
-  const [userId, setUserId] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  const loadExecution = useCallback(async (resolvedUserId: string) => {
+    const data = await getExecutionSnapshot(goalId, resolvedUserId);
+    setSnapshot(data);
+  }, [goalId]);
 
   useEffect(() => {
     if (!goalId) {
       return;
     }
 
-    const fetchTask = async () => {
+    const load = async () => {
       try {
-        const user = await getCurrentUser();
-        setUserId(user.userId);
+        setLoading(true);
+        setError(null);
 
-        try {
-          const data = await getNextTask(goalId, user.userId);
-          setTask(data);
-          setFinished(false);
-          setWaitingForNextPhase(false);
-        } catch (error) {
-          console.error(error);
-          // Check if goal is actually completed or just waiting for next phase
-          try {
-            const summaryRes = await getGoalSummary(goalId, user.userId);
-            if (summaryRes.ok) {
-              const summary = await summaryRes.json();
-              if (summary.status === "COMPLETED") {
-                setFinished(true);
-                setWaitingForNextPhase(false);
-              } else {
-                setTask(null);
-                setFinished(false);
-                setWaitingForNextPhase(true);
-              }
-            } else {
-              setFinished(true);
-              setWaitingForNextPhase(false);
-            }
-          } catch (summaryError) {
-            console.error("Failed to get goal summary:", summaryError);
-            setFinished(true);
-            setWaitingForNextPhase(false);
-          }
+        const user = await getCurrentUser();
+        const resolvedUserId = user.userId ?? user.userId;
+
+        if (!resolvedUserId) {
+          throw new Error("Unable to resolve current user ID.");
         }
-      } catch (error) {
-        console.error(error);
-        router.replace("/login");
+
+        setUserId(resolvedUserId);
+        await loadExecution(resolvedUserId);
+      } catch (err) {
+        console.error(err);
+        setError(
+          err instanceof Error ? err.message : "Failed to load goal execution."
+        );
       } finally {
         setLoading(false);
       }
     };
 
-    void fetchTask();
-  }, [goalId, router]);
+    void load();
+  }, [goalId, loadExecution]);
 
-  const loadNextTaskWithRetry = async () => {
-    const maxRetries = 3;
-    const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-    for (let attempt = 0; attempt < maxRetries; attempt += 1) {
-      try {
-        const next = await getNextTask(goalId, userId);
-        setTask(next);
-        setFinished(false);
-        setWaitingForNextPhase(false);
-        return;
-      } catch (error) {
-        console.error("Next task load attempt", attempt + 1, "failed", error);
-        if (attempt < maxRetries - 1) {
-          await delay(500);
-        }
-      }
-    }
-
-    // After retries, check goal status
-    try {
-      const summaryRes = await getGoalSummary(goalId, userId);
-      if (summaryRes.ok) {
-        const summary = await summaryRes.json();
-        if (summary.status === "COMPLETED") {
-          setTask(null);
-          setFinished(true);
-          setWaitingForNextPhase(false);
-        } else {
-          setTask(null);
-          setFinished(false);
-          setWaitingForNextPhase(true);
-        }
-      } else {
-        setTask(null);
-        setFinished(true);
-        setWaitingForNextPhase(false);
-      }
-    } catch (summaryError) {
-      console.error("Failed to get goal summary after retries:", summaryError);
-      setTask(null);
-      setFinished(true);
-      setWaitingForNextPhase(false);
-    }
-  };
-
-  const handleComplete = async () => {
-    if (!task || !userId) {
-      return;
-    }
+  const handleRefresh = useCallback(async () => {
+    if (!userId) return;
+    setError(null);
 
     try {
-      setActionLoading(true);
-      await completeTask(task.taskId, userId);
-      await loadNextTaskWithRetry();
-    } catch (error) {
-      console.error(error);
-      // On error, check if goal is completed or just waiting
-      try {
-        const summaryRes = await getGoalSummary(goalId, userId);
-        if (summaryRes.ok) {
-          const summary = await summaryRes.json();
-          if (summary.status === "COMPLETED") {
-            setFinished(true);
-            setWaitingForNextPhase(false);
-          } else {
-            setTask(null);
-            setFinished(false);
-            setWaitingForNextPhase(true);
-          }
-        } else {
-          setFinished(true);
-          setWaitingForNextPhase(false);
-        }
-      } catch (summaryError) {
-        console.error("Failed to get goal summary on complete error:", summaryError);
-        setFinished(true);
-        setWaitingForNextPhase(false);
-      }
-    } finally {
-      setActionLoading(false);
+      await loadExecution(userId);
+    } catch (err) {
+      console.error(err);
+      setError(
+        err instanceof Error ? err.message : "Failed to refresh execution."
+      );
     }
-  };
-
-  const handleSkip = async () => {
-    if (!task || !userId) {
-      return;
-    }
-
-    try {
-      setActionLoading(true);
-      await skipTask(task.taskId, userId);
-      await loadNextTaskWithRetry();
-    } catch (error) {
-      console.error(error);
-      // On error, check if goal is completed or just waiting
-      try {
-        const summaryRes = await getGoalSummary(goalId, userId);
-        if (summaryRes.ok) {
-          const summary = await summaryRes.json();
-          if (summary.status === "COMPLETED") {
-            setFinished(true);
-            setWaitingForNextPhase(false);
-          } else {
-            setTask(null);
-            setFinished(false);
-            setWaitingForNextPhase(true);
-          }
-        } else {
-          setFinished(true);
-          setWaitingForNextPhase(false);
-        }
-      } catch (summaryError) {
-        console.error("Failed to get goal summary on skip error:", summaryError);
-        setFinished(true);
-        setWaitingForNextPhase(false);
-      }
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handlePause = async () => {
-    if (!userId) {
-      return;
-    }
-
-    try {
-      await pauseGoal(goalId, userId);
-      setPaused(true);
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
-  const handleResume = async () => {
-    if (!userId) {
-      return;
-    }
-
-    try {
-      await resumeGoal(goalId, userId);
-      setPaused(false);
-    } catch (error) {
-      console.error(error);
-    }
-  };
+  }, [loadExecution, userId]);
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#FAFAFA]">
-        <p className="text-gray-400">Loading...</p>
-      </div>
+      <main className="min-h-screen bg-neutral-950 text-white px-6 py-10">
+        <div className="mx-auto max-w-5xl">
+          <div className="animate-pulse rounded-3xl border border-white/10 bg-white/5 p-8">
+            <div className="h-8 w-56 rounded bg-white/10" />
+            <div className="mt-4 h-4 w-96 max-w-full rounded bg-white/10" />
+            <div className="mt-10 h-40 rounded-2xl bg-white/10" />
+          </div>
+        </div>
+      </main>
     );
   }
 
-  if (finished || (!task && !waitingForNextPhase)) {
+  if (error) {
     return (
-      <main className="min-h-screen bg-[#FAFAFA] flex items-center justify-center px-6">
-        <div className="max-w-xl text-center">
-          <div className="h-px bg-gray-200 mb-10" />
+      <main className="min-h-screen bg-neutral-950 text-white px-6 py-10">
+        <div className="mx-auto max-w-3xl rounded-3xl border border-red-400/20 bg-red-500/10 p-8">
+          <h1 className="text-2xl font-semibold">Unable to load execution</h1>
+          <p className="mt-3 text-sm text-white/70">{error}</p>
 
-          <h2 className="text-3xl font-semibold tracking-tight text-[#111]">
-            You completed this goal.
-          </h2>
-
-          <p className="text-gray-500 mt-6 leading-relaxed">
-            The version of you that set this intention followed through.
-          </p>
-
-          <div className="mt-10 text-sm text-gray-400 space-y-2">
-            <p>All planned tasks completed.</p>
-            <p>Progress sustained.</p>
-          </div>
-
-          <div className="mt-12">
+          <div className="mt-6 flex gap-3">
             <button
-              onClick={() => router.push("/app")}
-              className="px-6 py-3 bg-black text-white rounded-xl transition hover:opacity-90"
+              onClick={() => void handleRefresh()}
+              className="rounded-xl bg-white px-4 py-2 text-sm font-medium text-black transition hover:opacity-90"
             >
-              Start a new goal
+              Retry
+            </button>
+            <button
+              onClick={() => router.push("/")}
+              className="rounded-xl border border-white/15 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/5"
+            >
+              Go home
             </button>
           </div>
         </div>
@@ -303,84 +108,24 @@ export default function GoalPage() {
     );
   }
 
-  if (waitingForNextPhase) {
+  if (!snapshot || !userId) {
     return (
-      <main className="min-h-screen bg-[#FAFAFA] flex items-center justify-center px-6">
-        <div className="max-w-xl text-center">
-          <div className="h-px bg-gray-200 mb-10" />
-
-          <h2 className="text-3xl font-semibold tracking-tight text-[#111]">
-            Preparing the next phase...
-          </h2>
-
-          <p className="text-gray-500 mt-6 leading-relaxed">
-            Your goal is still active, and the next batch of tasks is being prepared.
+      <main className="min-h-screen bg-neutral-950 text-white px-6 py-10">
+        <div className="mx-auto max-w-3xl rounded-3xl border border-white/10 bg-white/5 p-8">
+          <h1 className="text-2xl font-semibold">Execution unavailable</h1>
+          <p className="mt-3 text-sm text-white/70">
+            We could not load this goal right now.
           </p>
-
-          <div className="mt-10 text-sm text-gray-400 space-y-2">
-            <p>Current status: ACTIVE</p>
-            <p>If it takes a moment, you can refresh the page to check again.</p>
-          </div>
-
-          <div className="mt-12 flex justify-center gap-4">
-            <button
-              onClick={loadNextTaskWithRetry}
-              className="px-6 py-3 bg-black text-white rounded-xl transition hover:opacity-90"
-            >
-              Refresh
-            </button>
-            <button
-              onClick={() => router.push("/app")}
-              className="px-6 py-3 border border-black text-black rounded-xl transition hover:bg-black/5"
-            >
-              Back to goals
-            </button>
-          </div>
         </div>
       </main>
-    );
-  }
-
-  if (!task) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#FAFAFA]">
-        <p className="text-gray-400">Loading task...</p>
-      </div>
     );
   }
 
   return (
-    <main className="min-h-screen bg-[#FAFAFA] relative overflow-hidden px-6 py-16 flex flex-col items-center">
-      <div className="absolute inset-0 pointer-events-none opacity-5 bg-[radial-gradient(circle_at_1px_1px,_black_1px,_transparent_0)] [background-size:24px_24px]" />
-
-      <div className="relative z-10 w-full flex flex-col items-center">
-        <GoalHeader
-          goalTitle={task.goalTitle}
-          phaseName={
-            task.phaseIndex
-              ? `Phase ${task.phaseIndex} - ${task.phaseName}`
-              : task.phaseName
-          }
-          taskIndex={task.taskIndex}
-          taskCount={task.taskCount}
-          completedCount={task.completedCount}
-          paused={paused}
-          onPause={handlePause}
-          onResume={handleResume}
-        />
-
-        <TaskCard
-          taskId={task.taskId}
-          title={task.title}
-          description={task.description}
-          paused={paused}
-          loading={actionLoading}
-          onComplete={handleComplete}
-          onSkip={handleSkip}
-          questions={task.questions}
-          existingResponses={task.responses}
-        />
-      </div>
-    </main>
+    <GoalExecutionScreen
+      snapshot={snapshot}
+      userId={userId}
+      onRefresh={handleRefresh}
+    />
   );
 }
