@@ -48,6 +48,25 @@ public class Task {
 
     @UpdateTimestamp
     private LocalDateTime updatedAt;
+    @Column(name = "instruction_what")
+    private String instructionWhat;
 
+    @Column(name = "instruction_how")
+    private String instructionHow;
+
+    @Column(name = "instruction_why")
+    private String instructionWhy;
+
+    @Column(name = "success_criteria")
+    private String successCriteria;
+
+    @Column(name = "task_type")
+    private String taskType;
+
+    @Column(name = "visibility_status")
+    private String visibilityStatus;
+
+    @Column(name = "reflection_task")
+    private Boolean reflectionTask;
 }
 

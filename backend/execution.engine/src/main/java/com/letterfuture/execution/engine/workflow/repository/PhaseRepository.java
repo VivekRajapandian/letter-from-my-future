@@ -18,4 +18,6 @@ public interface PhaseRepository extends JpaRepository<Phase, UUID> {
     Optional<Phase> findByGoalIdAndStatus(UUID goalId, PhaseStatus status);
 
     Optional<Phase> findFirstByGoalIdAndStatusOrderByOrderIndex(UUID goalId, PhaseStatus status);
+
+    List<Phase> findByGoalIdOrderByOrderIndexAsc(UUID goalId);
 }

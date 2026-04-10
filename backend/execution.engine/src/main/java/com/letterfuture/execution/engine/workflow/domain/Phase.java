@@ -40,5 +40,17 @@ public class Phase {
     @UpdateTimestamp
     private LocalDateTime updatedAt;
 
+    @Column(name = "outline_id")
+    private UUID outlineId;
+
+    @Column(name = "phase_number")
+    private Integer phaseNumber;
+
+    @Column(name = "generation_source")
+    private String generationSource;
+
+    @Column(name = "planning_summary_snapshot")
+    private String planningSummarySnapshot;
+
 }
 

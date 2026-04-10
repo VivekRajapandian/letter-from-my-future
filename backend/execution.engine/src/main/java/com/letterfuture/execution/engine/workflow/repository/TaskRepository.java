@@ -19,6 +19,10 @@ public interface TaskRepository extends JpaRepository<Task, UUID> {
 
     List<Task> findAllByPhaseId(UUID phaseId);
 
+    List<Task> findAllByPhaseIdOrderByOrderIndex(UUID phaseId);
+
+    List<Task> findByPhaseIdOrderByOrderIndexAsc(UUID phaseId);
+
     @Query("""
             SELECT t
             FROM Task t
