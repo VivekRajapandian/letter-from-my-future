@@ -10,15 +10,7 @@ import com.letterfuture.execution.engine.workflow.domain.Task;
 import com.letterfuture.execution.engine.workflow.domain.TaskInputDefinition;
 import com.letterfuture.execution.engine.workflow.domain.TaskSubmission;
 import com.letterfuture.execution.engine.workflow.domain.TaskSubmissionValue;
-import com.letterfuture.execution.engine.workflow.dto.execution.ExecutionGoalDto;
-import com.letterfuture.execution.engine.workflow.dto.execution.ExecutionPhaseDto;
-import com.letterfuture.execution.engine.workflow.dto.execution.ExecutionPlanningDto;
-import com.letterfuture.execution.engine.workflow.dto.execution.ExecutionProgressDto;
-import com.letterfuture.execution.engine.workflow.dto.execution.ExecutionSnapshotResponse;
-import com.letterfuture.execution.engine.workflow.dto.execution.ExecutionTaskDto;
-import com.letterfuture.execution.engine.workflow.dto.execution.TaskInputDefinitionDto;
-import com.letterfuture.execution.engine.workflow.dto.execution.TaskInstructionDto;
-import com.letterfuture.execution.engine.workflow.dto.execution.TaskLatestSubmissionDto;
+import com.letterfuture.execution.engine.workflow.dto.execution.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -53,7 +45,7 @@ public class ExecutionSnapshotAssembler {
                 goal.getStatus() == null ? "UNKNOWN" : goal.getStatus().name(),
                 goal.getPlanningMode() == null ? "UNKNOWN" : goal.getPlanningMode(),
                 goal.getTargetDurationDays(),
-                goal.getPhaseCountPlanned(),
+                goal.getTotalPhasesPlanned(),
                 phases == null ? 0 : phases.size()
         );
 
@@ -121,7 +113,7 @@ public class ExecutionSnapshotAssembler {
                 phase.getStatus() == null ? "UNKNOWN" : phase.getStatus().name(),
                 phase.getOrderIndex(),
                 phase.getDurationDays(),
-                phase.getOutlineTitle()
+                null
         );
     }
 
@@ -220,17 +212,24 @@ public class ExecutionSnapshotAssembler {
         return null;
     }
 
-    private List<Map<String, String>> parseOptions(String optionsJson) {
+    private List<SelectOptionDto> parseOptions(String optionsJson) {
         if (optionsJson == null || optionsJson.isBlank()) {
             return null;
         }
 
         try {
-            return objectMapper.readValue(
+            List<Map<String, String>> rawOptions = objectMapper.readValue(
                     optionsJson,
                     new TypeReference<List<Map<String, String>>>() {
                     }
             );
+
+            return rawOptions.stream()
+                    .map(option -> new SelectOptionDto(
+                            option.get("label"),
+                            option.get("value")
+                    ))
+                    .toList();
         } catch (Exception ex) {
             return null;
         }
