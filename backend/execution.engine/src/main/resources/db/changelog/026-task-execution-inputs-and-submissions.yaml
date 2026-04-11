@@ -1,7 +1,13 @@
 databaseChangeLog:
   - changeSet:
-      id: 026-task-execution-inputs-and-submissions
+      id: 026-create-task-input-definition
       author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: HALT
+        - not:
+            tableExists:
+              tableName: task_input_definition
       changes:
         - createTable:
             tableName: task_input_definition
@@ -68,6 +74,20 @@ databaseChangeLog:
                   type: TIMESTAMP
                   defaultValueComputed: CURRENT_TIMESTAMP
 
+  - changeSet:
+      id: 026-fk-task-input-definition-task
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: HALT
+        - tableExists:
+            tableName: task_input_definition
+        - tableExists:
+            tableName: tasks
+        - not:
+            foreignKeyConstraintExists:
+              foreignKeyName: fk_task_input_definition_task
+      changes:
         - addForeignKeyConstraint:
             baseTableName: task_input_definition
             baseColumnNames: task_id
@@ -76,6 +96,16 @@ databaseChangeLog:
             referencedColumnNames: id
             onDelete: CASCADE
 
+  - changeSet:
+      id: 026-create-task-submission
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: HALT
+        - not:
+            tableExists:
+              tableName: task_submission
+      changes:
         - createTable:
             tableName: task_submission
             columns:
@@ -110,6 +140,20 @@ databaseChangeLog:
                   constraints:
                     nullable: false
 
+  - changeSet:
+      id: 026-fk-task-submission-task
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: HALT
+        - tableExists:
+            tableName: task_submission
+        - tableExists:
+            tableName: tasks
+        - not:
+            foreignKeyConstraintExists:
+              foreignKeyName: fk_task_submission_task
+      changes:
         - addForeignKeyConstraint:
             baseTableName: task_submission
             baseColumnNames: task_id
@@ -118,6 +162,20 @@ databaseChangeLog:
             referencedColumnNames: id
             onDelete: CASCADE
 
+  - changeSet:
+      id: 026-fk-task-submission-user
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: HALT
+        - tableExists:
+            tableName: task_submission
+        - tableExists:
+            tableName: users
+        - not:
+            foreignKeyConstraintExists:
+              foreignKeyName: fk_task_submission_user
+      changes:
         - addForeignKeyConstraint:
             baseTableName: task_submission
             baseColumnNames: user_id
@@ -126,6 +184,16 @@ databaseChangeLog:
             referencedColumnNames: id
             onDelete: CASCADE
 
+  - changeSet:
+      id: 026-create-task-submission-value
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: HALT
+        - not:
+            tableExists:
+              tableName: task_submission_value
+      changes:
         - createTable:
             tableName: task_submission_value
             columns:
@@ -161,6 +229,20 @@ databaseChangeLog:
                   name: value_json
                   type: TEXT
 
+  - changeSet:
+      id: 026-fk-task-submission-value-submission
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: HALT
+        - tableExists:
+            tableName: task_submission_value
+        - tableExists:
+            tableName: task_submission
+        - not:
+            foreignKeyConstraintExists:
+              foreignKeyName: fk_task_submission_value_submission
+      changes:
         - addForeignKeyConstraint:
             baseTableName: task_submission_value
             baseColumnNames: submission_id
@@ -169,6 +251,20 @@ databaseChangeLog:
             referencedColumnNames: id
             onDelete: CASCADE
 
+  - changeSet:
+      id: 026-fk-task-submission-value-input-definition
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: HALT
+        - tableExists:
+            tableName: task_submission_value
+        - tableExists:
+            tableName: task_input_definition
+        - not:
+            foreignKeyConstraintExists:
+              foreignKeyName: fk_task_submission_value_input_definition
+      changes:
         - addForeignKeyConstraint:
             baseTableName: task_submission_value
             baseColumnNames: input_definition_id
@@ -177,6 +273,19 @@ databaseChangeLog:
             referencedColumnNames: id
             onDelete: CASCADE
 
+  - changeSet:
+      id: 026-index-task-input-definition-task-id
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: HALT
+        - tableExists:
+            tableName: task_input_definition
+        - not:
+            indexExists:
+              indexName: idx_task_input_definition_task_id
+              tableName: task_input_definition
+      changes:
         - createIndex:
             tableName: task_input_definition
             indexName: idx_task_input_definition_task_id
@@ -184,6 +293,19 @@ databaseChangeLog:
               - column:
                   name: task_id
 
+  - changeSet:
+      id: 026-index-task-submission-task-id
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: HALT
+        - tableExists:
+            tableName: task_submission
+        - not:
+            indexExists:
+              indexName: idx_task_submission_task_id
+              tableName: task_submission
+      changes:
         - createIndex:
             tableName: task_submission
             indexName: idx_task_submission_task_id
@@ -191,6 +313,19 @@ databaseChangeLog:
               - column:
                   name: task_id
 
+  - changeSet:
+      id: 026-index-task-submission-user-id
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: HALT
+        - tableExists:
+            tableName: task_submission
+        - not:
+            indexExists:
+              indexName: idx_task_submission_user_id
+              tableName: task_submission
+      changes:
         - createIndex:
             tableName: task_submission
             indexName: idx_task_submission_user_id
@@ -198,6 +333,19 @@ databaseChangeLog:
               - column:
                   name: user_id
 
+  - changeSet:
+      id: 026-index-task-submission-value-submission-id
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: HALT
+        - tableExists:
+            tableName: task_submission_value
+        - not:
+            indexExists:
+              indexName: idx_task_submission_value_submission_id
+              tableName: task_submission_value
+      changes:
         - createIndex:
             tableName: task_submission_value
             indexName: idx_task_submission_value_submission_id
@@ -205,31 +353,22 @@ databaseChangeLog:
               - column:
                   name: submission_id
 
+  - changeSet:
+      id: 026-index-task-submission-value-input-definition-id
+      author: codex
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: HALT
+        - tableExists:
+            tableName: task_submission_value
+        - not:
+            indexExists:
+              indexName: idx_task_submission_value_input_definition_id
+              tableName: task_submission_value
+      changes:
         - createIndex:
             tableName: task_submission_value
             indexName: idx_task_submission_value_input_definition_id
             columns:
               - column:
                   name: input_definition_id
-      rollback:
-        - dropIndex:
-            tableName: task_submission_value
-            indexName: idx_task_submission_value_input_definition_id
-        - dropIndex:
-            tableName: task_submission_value
-            indexName: idx_task_submission_value_submission_id
-        - dropIndex:
-            tableName: task_submission
-            indexName: idx_task_submission_user_id
-        - dropIndex:
-            tableName: task_submission
-            indexName: idx_task_submission_task_id
-        - dropIndex:
-            tableName: task_input_definition
-            indexName: idx_task_input_definition_task_id
-        - dropTable:
-            tableName: task_submission_value
-        - dropTable:
-            tableName: task_submission
-        - dropTable:
-            tableName: task_input_definition

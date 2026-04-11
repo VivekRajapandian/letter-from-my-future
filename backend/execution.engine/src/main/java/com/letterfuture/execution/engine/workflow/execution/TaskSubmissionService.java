@@ -10,6 +10,7 @@ import com.letterfuture.execution.engine.workflow.domain.TaskSubmissionValue;
 import com.letterfuture.execution.engine.workflow.dto.execution.TaskSubmitRequest;
 import com.letterfuture.execution.engine.workflow.dto.execution.TaskSubmitResponse;
 import com.letterfuture.execution.engine.workflow.dto.execution.TaskSubmitValueDto;
+import com.letterfuture.execution.engine.workflow.planning.NextPhaseTriggerService;
 import com.letterfuture.execution.engine.workflow.repository.TaskInputDefinitionRepository;
 import com.letterfuture.execution.engine.workflow.repository.TaskRepository;
 import com.letterfuture.execution.engine.workflow.repository.TaskSubmissionRepository;
@@ -37,6 +38,8 @@ public class TaskSubmissionService {
     private final TaskInputDefinitionRepository taskInputDefinitionRepository;
     private final TaskSubmissionRepository taskSubmissionRepository;
     private final TaskSubmissionValueRepository taskSubmissionValueRepository;
+    private final PhaseCompletionEvaluator phaseCompletionEvaluator;
+    private final NextPhaseTriggerService nextPhaseTriggerService;
     private final ObjectMapper objectMapper;
 
     @Transactional
@@ -80,11 +83,17 @@ public class TaskSubmissionService {
         applyTaskStatus(task, submission.getAction());
         taskRepository.save(task);
 
+        PhaseCompletionEvaluator.PhaseEvaluationResult evaluationResult =
+                phaseCompletionEvaluator.evaluate(task.getId());
+
+        NextPhaseTriggerService.NextPhaseTriggerResult triggerResult =
+                nextPhaseTriggerService.handlePhaseEvaluation(evaluationResult);
+
         return new TaskSubmitResponse(
                 task.getId(),
                 submission.getId(),
-                task.getStatus() == null ? null : task.getStatus().name(),
-                false
+                task.getStatus().toString(),
+                triggerResult.generationNeeded() || evaluationResult.nextPhaseReady()
         );
     }
 
