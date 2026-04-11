@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import GoalExecutionScreen from "@/components/execution/GoalExecutionScreen";
 import PlanningStateBanner from "@/components/execution/PlanningStateBanner";
@@ -183,7 +184,7 @@ export default function GoalPage() {
             </button>
             <button
               type="button"
-              onClick={() => router.push("/")}
+              onClick={() => router.push("/app")}
               className="rounded-xl border border-white/15 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/5"
             >
               Go home
@@ -207,8 +208,27 @@ export default function GoalPage() {
     );
   }
 
-  return (
-    <main className="min-h-screen bg-[#071018] px-6 py-10 text-white">
+ return (
+  <main className="min-h-screen bg-[#071018] text-white">
+    <header className="sticky top-0 z-40 border-b border-white/10 bg-[#071018]/80 backdrop-blur">
+      <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+        <Link
+          href="/app"
+          className="text-sm font-semibold tracking-[0.22em] text-white/70 transition hover:text-white"
+        >
+          LETTER FROM MY FUTURE
+        </Link>
+
+        <Link
+          href="/app"
+          className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white/85 transition hover:bg-white/10"
+        >
+          Home
+        </Link>
+      </div>
+    </header>
+
+    <div className="px-6 py-10">
       <div className="mx-auto max-w-6xl space-y-6">
         {shouldShowBanner ? (
           <PlanningStateBanner
@@ -224,6 +244,7 @@ export default function GoalPage() {
           onRefresh={handleRefresh}
         />
       </div>
-    </main>
-  );
+    </div>
+  </main>
+);
 }

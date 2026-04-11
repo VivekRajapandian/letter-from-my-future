@@ -107,18 +107,34 @@ public class PhaseCompletionEvaluator {
                 .orElse(null);
 
         if (nextIncompletePhase != null) {
-            if (nextIncompletePhase.getStatus() != PhaseStatus.CURRENT) {
-                nextIncompletePhase.setStatus(PhaseStatus.CURRENT);
-                phaseRepository.save(nextIncompletePhase);
+            List<Task> nextPhaseTasks =
+                    taskRepository.findByPhaseIdOrderByOrderIndexAsc(nextIncompletePhase.getId());
+
+            boolean placeholderPhase = nextPhaseTasks.isEmpty()
+                    || nextIncompletePhase.getDurationDays() == null
+                    || nextIncompletePhase.getDurationDays() == 0;
+
+            if (placeholderPhase) {
+                goal.setPlanningState("GENERATING_NEXT_PHASE");
+                goalRepository.save(goal);
+
+                planningStateChanged = true;
+                nextPhaseReady = false;
+                message = "Current phase completed. Generating next phase tasks.";
+            } else {
+                if (nextIncompletePhase.getStatus() != PhaseStatus.CURRENT) {
+                    nextIncompletePhase.setStatus(PhaseStatus.CURRENT);
+                    phaseRepository.save(nextIncompletePhase);
+                }
+
+                goal.setPlanningState("READY");
+                updateCurrentPhaseNumber(goal, nextIncompletePhase);
+                goalRepository.save(goal);
+
+                planningStateChanged = true;
+                nextPhaseReady = true;
+                message = "Current phase completed. Existing next phase is ready.";
             }
-
-            goal.setPlanningState("READY");
-            updateCurrentPhaseNumber(goal, nextIncompletePhase);
-            goalRepository.save(goal);
-
-            planningStateChanged = true;
-            nextPhaseReady = true;
-            message = "Current phase completed. Existing next phase is ready.";
         } else {
             if (shouldMarkGoalCompleted(goal, allPhases)) {
                 goal.setStatus(GoalStatus.COMPLETED);

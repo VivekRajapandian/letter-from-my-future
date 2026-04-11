@@ -11,9 +11,7 @@ public class PlanningPromptFactory {
               "input": [
                 {
                   "role": "developer",
-                  "content": "You are a planning engine for an execution app.
-            Return only valid JSON matching the schema and satisfy every validation rule exactly. Create a complete, practical execution plan based on this goal description: %s.
-            Hard requirements: the plan must contain exactly 5 phases; target_duration_days must be an integer between 30 and 3650; each phase must have duration_days between 7 and 365; each phase must include 1 to 8 tasks; every task title and description must be non-empty; every task day must be an integer between 1 and 3650; keep the response detailed and actionable; do not include any prose outside the JSON."
+                  "content": "You are a planning engine for an execution app.\\nReturn only valid JSON matching the schema and satisfy every validation rule exactly. Create a complete, practical execution plan based on this goal description: %s.\\nHard requirements: the plan must contain exactly 5 phases; target_duration_days must be an integer between 30 and 3650; each phase must have duration_days between 7 and 365; each phase must include 1 to 8 tasks; every task title and description must be non-empty; every task day must be an integer between 1 and 3650; keep the response detailed and actionable; do not include any prose outside the JSON."
                 }
               ],
               "text": {
@@ -69,9 +67,7 @@ public class PlanningPromptFactory {
               "input": [
                 {
                   "role": "developer",
-                  "content": "You are a planning engine for an execution app.
-            Return only valid JSON matching the schema and satisfy every validation rule exactly. Generate a complete initial plan for this goal description: %s. First, plan out ALL phases of the journey (3-5 phases). Then provide: 1) A short goal interpretation, 2) Total estimated timeline, 3) An outline of all phase titles showing the complete journey, 4) Only the detailed first phase with tasks and questions. For each task, provide 3-4 simple data collection questions that help track progress.
-            Hard requirements: goal_summary must be non-empty; target_duration_days must be an integer between 30 and 3650; total_phases must be between 3 and 5; phase_outline must be an array with exact same length as total_phases with meaningful phase titles; the initial phase must have a title; duration_days must be an integer between 7 and 365; tasks must contain 1 to 8 items; every task must have 3-4 questions; every question must be concise and answerable; every task title and description must be non-empty; every task day must be an integer between 1 and 3650; do not include any prose outside the JSON."
+                  "content": "You are a planning engine for an execution app.\\nReturn only valid JSON matching the schema and satisfy every validation rule exactly. Generate a complete initial plan for this goal description: %s. First, plan out ALL phases of the journey (3-5 phases). Then provide: 1) A short goal interpretation, 2) Total estimated timeline, 3) An outline of all phase titles showing the complete journey, 4) Only the detailed first phase with tasks and questions. For each task, provide 3-4 simple data collection questions that help track progress.\\nHard requirements: goal_summary must be non-empty; target_duration_days must be an integer between 30 and 3650; total_phases must be between 3 and 5; phase_outline must be an array with exact same length as total_phases with meaningful phase titles; the initial phase must have a title; duration_days must be an integer between 7 and 365; tasks must contain 1 to 8 items; every task must have 3-4 questions; every question must be concise and answerable; every task title and description must be non-empty; every task day must be an integer between 1 and 3650; do not include any prose outside the JSON."
                 }
               ],
               "text": {
@@ -152,13 +148,10 @@ public class PlanningPromptFactory {
     private static final String NEXT_PHASE_PAYLOAD_TEMPLATE = """
             {
               "model": "gpt-4o-mini",
-              "messages": [
+              "input": [
                 {
-                  "role": "system",
-                  "content": "You are a planning engine for an execution app.
-            Return only valid JSON matching the schema and rules exactly. For the goal '%s', the user is completing Phase %d of %d total phases. Here is the phase history:\\n%s\\nThe user just completed the previous phase with these responses:\\n%s\\nDecide the next phase based on the user's actual progress and responses. Consider if the user is tracking well or needs adjustments. If this is the final phase (phase number equals total phases) and progress looks good, then return {\\\"complete\\\": true}.
-            Otherwise, generate the next phase with customized tasks and questions that build on the user's previous progress.
-            Hard requirements: if phase_number equals total_phases, determine completion based on user progress; if complete=true, do not include phase field; if complete=false, phase.title must be non-empty; duration_days must be an integer between 7 and 365; tasks must contain 1 to 8 items; every task must have 3-4 questions customized for the user's responses; every task title and description must be non-empty; every task day must be an integer between 1 and 3650; do not include any prose outside the JSON."
+                  "role": "developer",
+                  "content": "You are a planning engine for an execution app.\\nReturn only valid JSON matching the schema and rules exactly. For the goal '%s', the user is completing Phase %d of %d total phases. Here is the phase history:\\n%s\\nThe user just completed the previous phase with these responses:\\n%s\\nDecide the next phase based on the user's actual progress and responses. Consider if the user is tracking well or needs adjustments. If this is the final phase (phase number equals total phases) and progress looks good, then return {\\\"complete\\\": true}.\\nOtherwise, generate the next phase with customized tasks and questions that build on the user's previous progress.\\nHard requirements: if phase_number equals total_phases, determine completion based on user progress; if complete=true, do not include phase field; if complete=false, phase.title must be non-empty; duration_days must be an integer between 7 and 365; tasks must contain 1 to 8 items; every task must have 3-4 questions customized for the user's responses; every task title and description must be non-empty; every task day must be an integer between 1 and 3650; do not include any prose outside the JSON."
                 }
               ],
               "text": {
