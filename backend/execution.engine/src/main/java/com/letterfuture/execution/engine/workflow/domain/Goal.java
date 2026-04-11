@@ -27,12 +27,39 @@ public class Goal {
 
     private String title;
 
+    @Column(columnDefinition = "TEXT")
+    private String description;
+
+    @Column(columnDefinition = "TEXT")
+    private String summary;
+
+    @Column(name = "target_duration_days")
+    private Integer targetDurationDays;
+
     private LocalDate targetDate;
 
     private LocalDateTime createdAt;
 
     @UpdateTimestamp
     private LocalDateTime updatedAt;
+
+    @Column(name = "planning_mode")
+    private String planningMode;
+
+    @Column(name = "planning_state")
+    private String planningState;
+
+    @Column(name = "total_phases_planned")
+    private Integer totalPhasesPlanned;
+
+    @Column(name = "current_phase_number")
+    private Integer currentPhaseNumber;
+
+    @Column(name = "goal_input_text")
+    private String goalInputText;
+
+    @Column(name = "future_you_tone")
+    private String futureYouTone;
 
 }
 

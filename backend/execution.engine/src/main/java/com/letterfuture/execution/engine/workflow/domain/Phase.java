@@ -1,6 +1,10 @@
 package com.letterfuture.execution.engine.workflow.domain;
 
+import com.letterfuture.execution.engine.enums.PhaseStatus;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.Getter;
@@ -23,12 +27,30 @@ public class Phase {
 
     private String title;
 
+    @Column(name = "duration_days")
+    private Integer durationDays;
+
+    @Enumerated(EnumType.STRING)
+    private PhaseStatus status;
+
     private Integer orderIndex;
 
     private LocalDateTime createdAt;
 
     @UpdateTimestamp
     private LocalDateTime updatedAt;
+
+    @Column(name = "outline_id")
+    private UUID outlineId;
+
+    @Column(name = "phase_number")
+    private Integer phaseNumber;
+
+    @Column(name = "generation_source")
+    private String generationSource;
+
+    @Column(name = "planning_summary_snapshot")
+    private String planningSummarySnapshot;
 
 }
 

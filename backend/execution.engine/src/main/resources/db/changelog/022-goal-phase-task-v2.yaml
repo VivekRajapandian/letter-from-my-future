@@ -1,0 +1,64 @@
+databaseChangeLog:
+  - changeSet:
+      id: 022-goal-phase-task-v2
+      author: vivek
+      changes:
+        - addColumn:
+            tableName: goals
+            columns:
+              - column:
+                  name: description
+                  type: TEXT
+              - column:
+                  name: summary
+                  type: TEXT
+              - column:
+                  name: target_duration_days
+                  type: INTEGER
+        - addColumn:
+            tableName: phases
+            columns:
+              - column:
+                  name: duration_days
+                  type: INTEGER
+              - column:
+                  name: status
+                  type: VARCHAR(50)
+                  defaultValue: PLANNED
+        - addColumn:
+            tableName: tasks
+            columns:
+              - column:
+                  name: scheduled_day
+                  type: INTEGER
+              - column:
+                  name: completed_at
+                  type: TIMESTAMP
+              - column:
+                  name: input_data
+                  type: TEXT
+      rollback:
+        - dropColumn:
+            columnName: input_data
+            tableName: tasks
+        - dropColumn:
+            columnName: completed_at
+            tableName: tasks
+        - dropColumn:
+            columnName: scheduled_day
+            tableName: tasks
+        - dropColumn:
+            columnName: status
+            tableName: phases
+        - dropColumn:
+            columnName: duration_days
+            tableName: phases
+        - dropColumn:
+            columnName: target_duration_days
+            tableName: goals
+        - dropColumn:
+            columnName: summary
+            tableName: goals
+        - dropColumn:
+            columnName: description
+            tableName: goals

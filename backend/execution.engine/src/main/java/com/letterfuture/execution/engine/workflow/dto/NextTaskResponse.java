@@ -4,6 +4,7 @@ package com.letterfuture.execution.engine.workflow.dto;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
+import java.util.List;
 import java.util.UUID;
 
 @Getter
@@ -24,6 +25,8 @@ public class NextTaskResponse {
     private int taskCount;
     private int completedCount;
 
+    private List<TaskQuestionDTO> questions;
+    private List<TaskResponseDTO> responses;
 
     // getters
 }

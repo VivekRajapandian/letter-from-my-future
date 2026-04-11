@@ -1,0 +1,125 @@
+databaseChangeLog:
+  - changeSet:
+      id: 025-progressive-planning-columns
+      author: vivek
+      changes:
+        - addColumn:
+            tableName: goals
+            columns:
+              - column:
+                  name: planning_mode
+                  type: VARCHAR(50)
+                  defaultValue: PROGRESSIVE
+              - column:
+                  name: planning_state
+                  type: VARCHAR(50)
+                  defaultValue: READY
+              - column:
+                  name: total_phases_planned
+                  type: INTEGER
+              - column:
+                  name: current_phase_number
+                  type: INTEGER
+              - column:
+                  name: goal_input_text
+                  type: TEXT
+              - column:
+                  name: future_you_tone
+                  type: VARCHAR(100)
+
+        - addColumn:
+            tableName: phases
+            columns:
+              - column:
+                  name: outline_id
+                  type: UUID
+              - column:
+                  name: phase_number
+                  type: INTEGER
+              - column:
+                  name: generation_source
+                  type: VARCHAR(50)
+              - column:
+                  name: planning_summary_snapshot
+                  type: TEXT
+
+        - addColumn:
+            tableName: tasks
+            columns:
+              - column:
+                  name: instruction_what
+                  type: TEXT
+              - column:
+                  name: instruction_how
+                  type: TEXT
+              - column:
+                  name: instruction_why
+                  type: TEXT
+              - column:
+                  name: success_criteria
+                  type: TEXT
+              - column:
+                  name: task_type
+                  type: VARCHAR(50)
+              - column:
+                  name: visibility_status
+                  type: VARCHAR(50)
+              - column:
+                  name: reflection_task
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+
+      rollback:
+        - dropColumn:
+            tableName: tasks
+            columnName: reflection_task
+        - dropColumn:
+            tableName: tasks
+            columnName: visibility_status
+        - dropColumn:
+            tableName: tasks
+            columnName: task_type
+        - dropColumn:
+            tableName: tasks
+            columnName: success_criteria
+        - dropColumn:
+            tableName: tasks
+            columnName: instruction_why
+        - dropColumn:
+            tableName: tasks
+            columnName: instruction_how
+        - dropColumn:
+            tableName: tasks
+            columnName: instruction_what
+
+        - dropColumn:
+            tableName: phases
+            columnName: planning_summary_snapshot
+        - dropColumn:
+            tableName: phases
+            columnName: generation_source
+        - dropColumn:
+            tableName: phases
+            columnName: phase_number
+        - dropColumn:
+            tableName: phases
+            columnName: outline_id
+
+        - dropColumn:
+            tableName: goals
+            columnName: future_you_tone
+        - dropColumn:
+            tableName: goals
+            columnName: goal_input_text
+        - dropColumn:
+            tableName: goals
+            columnName: current_phase_number
+        - dropColumn:
+            tableName: goals
+            columnName: total_phases_planned
+        - dropColumn:
+            tableName: goals
+            columnName: planning_state
+        - dropColumn:
+            tableName: goals
+            columnName: planning_mode

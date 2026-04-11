@@ -1,0 +1,37 @@
+databaseChangeLog:
+  - changeSet:
+      id: 024-create-task-responses
+      author: vivek
+      changes:
+        - createTable:
+            tableName: task_responses
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  defaultValueComputed: uuid_generate_v4()
+                  constraints:
+                    primaryKey: true
+
+              - column:
+                  name: task_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: question_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: response
+                  type: TEXT
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP

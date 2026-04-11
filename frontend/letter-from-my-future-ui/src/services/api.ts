@@ -42,6 +42,10 @@ export async function getNextTask(goalId: string, userId: string) {
   return res.json();
 }
 
+export async function getGoalSummary(goalId: string, userId: string) {
+  return apiFetch(`/goals/${goalId}/summary?userId=${userId}`);
+}
+
 export async function completeTask(taskId: string, userId: string) {
   const res = await apiFetch(`/tasks/${taskId}/${userId}/complete`, {
     method: "POST",
@@ -81,6 +85,21 @@ export async function resumeGoal(goalId: string, userId: string) {
     throw new Error("Failed to resume goal");
   }
 }
+
+export async function submitTaskResponses(
+  taskId: string,
+  responses: Array<{ questionId: string; response: string }>
+) {
+  const res = await apiFetch(`/tasks/${taskId}/responses`, {
+    method: "POST",
+    body: JSON.stringify(responses),
+  });
+
+  if (!res.ok) {
+    throw new Error("Failed to submit task responses");
+  }
+}
+
 
 export type GoalCardResponse = {
   goalId: string;

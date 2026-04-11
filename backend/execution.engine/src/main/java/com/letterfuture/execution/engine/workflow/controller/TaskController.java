@@ -1,16 +1,21 @@
 package com.letterfuture.execution.engine.workflow.controller;
 
+import com.letterfuture.execution.engine.workflow.dto.SubmitTaskResponseRequest;
 import com.letterfuture.execution.engine.workflow.engine.WorkflowEngine;
+import com.letterfuture.execution.engine.workflow.service.TaskResponseService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.UUID;
+
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/tasks")
 public class TaskController {
 
     private final WorkflowEngine engine;
+    private final TaskResponseService taskResponseService;
 
     @PostMapping("/{taskId}/{userId}/complete")
     public void complete(@PathVariable UUID taskId,
@@ -52,6 +57,14 @@ public class TaskController {
             @PathVariable UUID userId){
 
         engine.resumeTask(taskId, userId);
+    }
+
+    @PostMapping("/{taskId}/responses")
+    public void submitResponses(
+            @PathVariable UUID taskId,
+            @RequestBody List<SubmitTaskResponseRequest> responses){
+
+        taskResponseService.saveTaskResponses(taskId, responses);
     }
 }
 

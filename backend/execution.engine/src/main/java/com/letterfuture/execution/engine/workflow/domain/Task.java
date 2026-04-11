@@ -26,6 +26,9 @@ public class Task {
 
     private String description;
 
+    @Column(name = "scheduled_day")
+    private Integer scheduledDay;
+
     @Column(nullable = false)
     @Enumerated(EnumType.STRING)
     private TaskStatus status;
@@ -34,11 +37,36 @@ public class Task {
 
     private LocalDateTime createdAt;
 
+    @Column(name = "completed_at")
+    private LocalDateTime completedAt;
+
+    @Column(name = "input_data")
+    private String inputData;
+
     @Version
     private Long version;
 
     @UpdateTimestamp
     private LocalDateTime updatedAt;
+    @Column(name = "instruction_what")
+    private String instructionWhat;
 
+    @Column(name = "instruction_how")
+    private String instructionHow;
+
+    @Column(name = "instruction_why")
+    private String instructionWhy;
+
+    @Column(name = "success_criteria")
+    private String successCriteria;
+
+    @Column(name = "task_type")
+    private String taskType;
+
+    @Column(name = "visibility_status")
+    private String visibilityStatus;
+
+    @Column(name = "reflection_task")
+    private Boolean reflectionTask;
 }
 
