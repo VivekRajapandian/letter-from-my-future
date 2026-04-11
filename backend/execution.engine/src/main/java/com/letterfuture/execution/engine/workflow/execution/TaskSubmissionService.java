@@ -2,6 +2,7 @@ package com.letterfuture.execution.engine.workflow.execution;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.letterfuture.execution.engine.enums.TaskStatus;
 import com.letterfuture.execution.engine.workflow.domain.Task;
 import com.letterfuture.execution.engine.workflow.domain.TaskInputDefinition;
 import com.letterfuture.execution.engine.workflow.domain.TaskSubmission;
@@ -19,8 +20,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
-import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -62,7 +63,7 @@ public class TaskSubmissionService {
         submission.setUserId(request.userId());
         submission.setAction(normalizeAction(request.action()));
         submission.setNote(blankToNull(request.note()));
-        submission.setSubmittedAt(Instant.now());
+        submission.setSubmittedAt(LocalDateTime.now());
 
         taskSubmissionRepository.save(submission);
 
@@ -82,7 +83,7 @@ public class TaskSubmissionService {
         return new TaskSubmitResponse(
                 task.getId(),
                 submission.getId(),
-                task.getStatus(),
+                task.getStatus() == null ? null : task.getStatus().name(),
                 false
         );
     }
@@ -126,7 +127,7 @@ public class TaskSubmissionService {
         }
 
         List<TaskInputDefinition> requiredInputs = inputDefinitionById.values().stream()
-                .filter(input -> Boolean.TRUE.equals(input.getRequired()))
+                .filter(TaskInputDefinition::isRequired)
                 .toList();
 
         Map<UUID, Object> submittedByInputId = (values == null ? List.<TaskSubmitValueDto>of() : values).stream()
@@ -201,20 +202,20 @@ public class TaskSubmissionService {
     private void applyTaskStatus(Task task, String action) {
         switch (normalizeAction(action)) {
             case "SAVE_PROGRESS" -> {
-                if (isBlank(task.getStatus()) || "NOT_STARTED".equalsIgnoreCase(task.getStatus())) {
-                    task.setStatus("IN_PROGRESS");
+                if (task.getStatus() == null) {
+                    task.setStatus(TaskStatus.AVAILABLE);
                 }
             }
             case "COMPLETE" -> {
-                task.setStatus("COMPLETED");
-                task.setCompletedAt(Instant.now());
+                task.setStatus(TaskStatus.COMPLETED);
+                task.setCompletedAt(LocalDateTime.now());
             }
             case "SKIP" -> {
-                task.setStatus("SKIPPED");
+                task.setStatus(TaskStatus.SKIPPED);
                 task.setCompletedAt(null);
             }
             case "REOPEN" -> {
-                task.setStatus("IN_PROGRESS");
+                task.setStatus(TaskStatus.AVAILABLE);
                 task.setCompletedAt(null);
             }
             default -> throw new ResponseStatusException(

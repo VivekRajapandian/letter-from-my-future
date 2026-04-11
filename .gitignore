@@ -1,0 +1,40 @@
+# OS and editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.iml
+
+# Backend: Gradle / Spring Boot / Java
+backend/execution.engine/.gradle/
+backend/execution.engine/.gradle-cache/
+backend/execution.engine/build/
+backend/execution.engine/out/
+backend/execution.engine/bin/
+backend/execution.engine/.classpath
+backend/execution.engine/.factorypath
+backend/execution.engine/.project
+backend/execution.engine/.settings/
+backend/execution.engine/.apt_generated/
+backend/execution.engine/.springBeans
+backend/execution.engine/.sts4-cache/
+backend/execution.engine/HELP.md
+
+# Frontend: Next.js / Node
+frontend/letter-from-my-future-ui/node_modules/
+frontend/letter-from-my-future-ui/.next/
+frontend/letter-from-my-future-ui/out/
+frontend/letter-from-my-future-ui/build/
+frontend/letter-from-my-future-ui/coverage/
+frontend/letter-from-my-future-ui/.vercel/
+frontend/letter-from-my-future-ui/*.tsbuildinfo
+frontend/letter-from-my-future-ui/next-env.d.ts
+
+# Package manager and debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Local environment files
+frontend/letter-from-my-future-ui/.env*

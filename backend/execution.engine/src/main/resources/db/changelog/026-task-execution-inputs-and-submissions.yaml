@@ -1,0 +1,235 @@
+databaseChangeLog:
+  - changeSet:
+      id: 026-task-execution-inputs-and-submissions
+      author: codex
+      changes:
+        - createTable:
+            tableName: task_input_definition
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: task_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: key
+                  type: TEXT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: label
+                  type: TEXT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: field_type
+                  type: TEXT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: required
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+              - column:
+                  name: placeholder
+                  type: TEXT
+              - column:
+                  name: help_text
+                  type: TEXT
+              - column:
+                  name: order_index
+                  type: INTEGER
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: unit
+                  type: TEXT
+              - column:
+                  name: options_json
+                  type: TEXT
+              - column:
+                  name: validation_json
+                  type: TEXT
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+
+        - addForeignKeyConstraint:
+            baseTableName: task_input_definition
+            baseColumnNames: task_id
+            constraintName: fk_task_input_definition_task
+            referencedTableName: tasks
+            referencedColumnNames: id
+            onDelete: CASCADE
+
+        - createTable:
+            tableName: task_submission
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: task_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: user_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: action
+                  type: TEXT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: note
+                  type: TEXT
+              - column:
+                  name: submitted_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+
+        - addForeignKeyConstraint:
+            baseTableName: task_submission
+            baseColumnNames: task_id
+            constraintName: fk_task_submission_task
+            referencedTableName: tasks
+            referencedColumnNames: id
+            onDelete: CASCADE
+
+        - addForeignKeyConstraint:
+            baseTableName: task_submission
+            baseColumnNames: user_id
+            constraintName: fk_task_submission_user
+            referencedTableName: users
+            referencedColumnNames: id
+            onDelete: CASCADE
+
+        - createTable:
+            tableName: task_submission_value
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: submission_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: input_definition_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: value_text
+                  type: TEXT
+              - column:
+                  name: value_number
+                  type: DECIMAL(19,2)
+              - column:
+                  name: value_boolean
+                  type: BOOLEAN
+              - column:
+                  name: value_date
+                  type: DATE
+              - column:
+                  name: value_json
+                  type: TEXT
+
+        - addForeignKeyConstraint:
+            baseTableName: task_submission_value
+            baseColumnNames: submission_id
+            constraintName: fk_task_submission_value_submission
+            referencedTableName: task_submission
+            referencedColumnNames: id
+            onDelete: CASCADE
+
+        - addForeignKeyConstraint:
+            baseTableName: task_submission_value
+            baseColumnNames: input_definition_id
+            constraintName: fk_task_submission_value_input_definition
+            referencedTableName: task_input_definition
+            referencedColumnNames: id
+            onDelete: CASCADE
+
+        - createIndex:
+            tableName: task_input_definition
+            indexName: idx_task_input_definition_task_id
+            columns:
+              - column:
+                  name: task_id
+
+        - createIndex:
+            tableName: task_submission
+            indexName: idx_task_submission_task_id
+            columns:
+              - column:
+                  name: task_id
+
+        - createIndex:
+            tableName: task_submission
+            indexName: idx_task_submission_user_id
+            columns:
+              - column:
+                  name: user_id
+
+        - createIndex:
+            tableName: task_submission_value
+            indexName: idx_task_submission_value_submission_id
+            columns:
+              - column:
+                  name: submission_id
+
+        - createIndex:
+            tableName: task_submission_value
+            indexName: idx_task_submission_value_input_definition_id
+            columns:
+              - column:
+                  name: input_definition_id
+      rollback:
+        - dropIndex:
+            tableName: task_submission_value
+            indexName: idx_task_submission_value_input_definition_id
+        - dropIndex:
+            tableName: task_submission_value
+            indexName: idx_task_submission_value_submission_id
+        - dropIndex:
+            tableName: task_submission
+            indexName: idx_task_submission_user_id
+        - dropIndex:
+            tableName: task_submission
+            indexName: idx_task_submission_task_id
+        - dropIndex:
+            tableName: task_input_definition
+            indexName: idx_task_input_definition_task_id
+        - dropTable:
+            tableName: task_submission_value
+        - dropTable:
+            tableName: task_submission
+        - dropTable:
+            tableName: task_input_definition

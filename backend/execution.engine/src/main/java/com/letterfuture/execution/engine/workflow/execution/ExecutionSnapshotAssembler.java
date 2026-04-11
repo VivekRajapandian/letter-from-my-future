@@ -14,6 +14,7 @@ import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.*;
 
 @Component
@@ -51,7 +52,7 @@ public class ExecutionSnapshotAssembler {
                 goal.getId(),
                 goal.getTitle(),
                 goal.getSummary(),
-                goal.getStatus(),
+                goal.getStatus() == null ? null : goal.getStatus().name(),
                 goal.getPlanningMode(),
                 goal.getTargetDurationDays(),
                 phaseCountPlanned,
@@ -75,7 +76,7 @@ public class ExecutionSnapshotAssembler {
     }
 
     private String derivePlanningState(Goal goal, Phase activePhase, List<Task> tasks) {
-        if (equalsIgnoreCase(goal.getStatus(), "COMPLETED")) {
+        if (goal.getStatus() != null && equalsIgnoreCase(goal.getStatus().name(), "COMPLETED")) {
             return "COMPLETED";
         }
 
@@ -116,7 +117,7 @@ public class ExecutionSnapshotAssembler {
         return new ExecutionPhaseDto(
                 activePhase.getId(),
                 activePhase.getTitle(),
-                activephase.getStatus().toString(),
+                activePhase.getStatus() == null ? null : activePhase.getStatus().name(),
                 activePhase.getOrderIndex(),
                 activePhase.getDurationDays(),
                 activePhase.getTitle()
@@ -187,7 +188,7 @@ public class ExecutionSnapshotAssembler {
                 input.getKey(),
                 input.getLabel(),
                 input.getFieldType(),
-                input.getRequired(),
+                input.isRequired(),
                 input.getPlaceholder(),
                 input.getHelpText(),
                 input.getUnit(),

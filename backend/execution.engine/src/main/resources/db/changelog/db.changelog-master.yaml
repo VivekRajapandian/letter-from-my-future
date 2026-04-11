@@ -49,4 +49,6 @@ databaseChangeLog:
         file: db/changelog/024-task-responses.yaml
   - include:
         file: db/changelog/025-progressive-planning-columns.yaml
+  - include:
+        file: db/changelog/026-task-execution-inputs-and-submissions.yaml
 

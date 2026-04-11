@@ -17,7 +17,6 @@ import java.util.UUID;
 public class TaskInputDefinition {
     @Id
     private UUID id;
-    @Id
     private UUID taskId;
     @Column(nullable = false, columnDefinition = "TEXT")
     private String key;

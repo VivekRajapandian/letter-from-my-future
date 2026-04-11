@@ -20,9 +20,7 @@ public class TaskSubmission {
 
     @Id
     private UUID id;
-    @Id
     private UUID taskId;
-    @Id
     private UUID userId;
     @Column(nullable = false, columnDefinition = "TEXT")
     private String action; // SAVE_PROGRESS, COMPLETE, SKIP, REOPEN

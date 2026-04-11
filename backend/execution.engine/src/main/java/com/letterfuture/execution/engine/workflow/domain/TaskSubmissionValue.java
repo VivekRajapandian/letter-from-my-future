@@ -19,9 +19,7 @@ import java.util.UUID;
 public class TaskSubmissionValue {
     @Id
     private UUID id;
-    @Id
     private UUID submissionId;
-    @Id
     private UUID inputDefinitionId;
     @Column(nullable = false, columnDefinition = "TEXT")
     private String valueText;
