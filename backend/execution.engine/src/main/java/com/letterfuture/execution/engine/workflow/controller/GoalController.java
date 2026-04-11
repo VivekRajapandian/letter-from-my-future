@@ -5,6 +5,7 @@ import com.letterfuture.execution.engine.workflow.dto.CreateGoalRequest;
 import com.letterfuture.execution.engine.workflow.dto.NextTaskResponse;
 import com.letterfuture.execution.engine.workflow.engine.WorkflowEngine;
 import com.letterfuture.execution.engine.workflow.llm.OpenAiPlanClient;
+import com.letterfuture.execution.engine.workflow.planning.PlanningPromptFactory;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -24,24 +25,38 @@ public class GoalController {
     private final PlanCompiler compiler;
     private final WorkflowEngine engine;
     private final OpenAiPlanClient openAiPlanClient;
+    private final PlanningPromptFactory planningPromptFactory;
 
-    // Create goal from LLM plan
     @PostMapping
     public UUID createGoal(
             @RequestParam UUID userId,
-            @Valid @RequestBody CreateGoalRequest request){
+            @Valid @RequestBody CreateGoalRequest request
+    ) {
         int maxAttempts = MAX_PLAN_GENERATION_RETRIES + 1;
         IllegalArgumentException lastValidationFailure = null;
 
         for (int attempt = 1; attempt <= maxAttempts; attempt++) {
-            String llmResponseJson = openAiPlanClient.generateInitialGoalPlan(request.getGoalDescription());
+            String payload = planningPromptFactory.buildInitialGoalPlanPayload(
+                    request.getGoalDescription()
+            );
+
+            String llmResponseJson = openAiPlanClient.executeResponsesPayload(payload);
 
             try {
-                return compiler.compileAndCreateInitialGoal(userId, request.getGoalDescription(), llmResponseJson);
+                return compiler.compileAndCreateInitialGoal(
+                        userId,
+                        request.getGoalDescription(),
+                        llmResponseJson
+                );
             } catch (IllegalArgumentException ex) {
                 lastValidationFailure = ex;
-                log.warn("Generated plan rejected for user {} on attempt {}/{}: {}",
-                        userId, attempt, maxAttempts, ex.getMessage());
+                log.warn(
+                        "Generated plan rejected for user {} on attempt {}/{}: {}",
+                        userId,
+                        attempt,
+                        maxAttempts,
+                        ex.getMessage()
+                );
             }
         }
 
@@ -51,15 +66,16 @@ public class GoalController {
     @GetMapping("/{goalId}/next-task")
     public NextTaskResponse getNextTask(
             @PathVariable UUID goalId,
-            @RequestParam UUID userId){
-
+            @RequestParam UUID userId
+    ) {
         return engine.getNextTask(goalId, userId);
     }
 
     @PostMapping("/{goalId}/{userId}/pause")
-    public void pause(@PathVariable UUID goalId,
-                      @PathVariable UUID userId){
+    public void pause(
+            @PathVariable UUID goalId,
+            @PathVariable UUID userId
+    ) {
         engine.pauseGoal(goalId, userId);
     }
 }
-

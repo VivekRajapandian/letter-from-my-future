@@ -31,6 +31,9 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import com.letterfuture.execution.engine.workflow.signals.PhaseExecutionSignals;
+import com.letterfuture.execution.engine.workflow.signals.SubmissionAggregationService;
+
 @Service
 @RequiredArgsConstructor
 public class WorkflowEngine {
@@ -42,6 +45,7 @@ public class WorkflowEngine {
     private final TaskQuestionRepository taskQuestionRepo;
     private final TaskResponseRepository taskResponseRepo;
     private final NextPhaseGenerationService nextPhaseGenerationService;
+    private final SubmissionAggregationService submissionAggregationService;
     private static final Logger log =
             LoggerFactory.getLogger(WorkflowEngine.class);
 
@@ -187,7 +191,20 @@ public class WorkflowEngine {
             log.info("Next phase found. Generating detailed tasks for phase {} using LLM.",
                     nextPhaseOpt.get().getOrderIndex() + 1);
             try {
-                String nextPhaseJson = nextPhaseGenerationService.generateNextPhaseForCompletedPhase(completedPhase);
+                Goal goal = goalRepo.findById(goalId)
+                        .orElseThrow(() -> new RuntimeException("Goal not found"));
+
+                PhaseExecutionSignals signals = submissionAggregationService.aggregatePhaseSignals(
+                        goalId,
+                        completedPhase.getId(),
+                        goal.getUserId()
+                );
+
+                String nextPhaseJson = nextPhaseGenerationService.generateNextPhaseForCompletedPhase(
+                        completedPhase,
+                        signals.progressSummary()
+                );
+
                 UUID nextPhaseId = nextPhaseGenerationService.processNextPhaseResponse(goalId, nextPhaseJson);
                 if (nextPhaseId != null) {
                     // Verify that the first task of the newly generated phase is available

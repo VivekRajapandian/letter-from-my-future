@@ -50,6 +50,18 @@ export type ExecutionTask = {
   latestSubmission?: TaskLatestSubmission | null;
 };
 
+export type ExecutionPlanning = {
+  state: string;
+  canGenerateNextPhase: boolean;
+  reason?: string | null;
+  sourcePhaseId?: string | null;
+  nextPhaseId?: string | null;
+  futureYouMessage?: string | null;
+  transitionReason?: string | null;
+  generatedFromSignals?: string | null;
+  generatedAt?: string | null;
+};
+
 export type ExecutionSnapshot = {
   goal: {
     goalId: string;
@@ -61,11 +73,7 @@ export type ExecutionSnapshot = {
     phaseCountPlanned?: number | null;
     phaseCountCreated?: number | null;
   };
-  planning: {
-    state: string;
-    canGenerateNextPhase: boolean;
-    reason?: string | null;
-  };
+  planning: ExecutionPlanning;
   activePhase: {
     phaseId: string;
     title: string;

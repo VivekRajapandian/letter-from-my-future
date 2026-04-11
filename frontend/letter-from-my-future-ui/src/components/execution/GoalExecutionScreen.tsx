@@ -52,11 +52,7 @@ export default function GoalExecutionScreen({
           </div>
         </header>
 
-        <PlanningStateBanner
-          state={planning.state}
-          reason={planning.reason}
-          onRefresh={onRefresh}
-        />
+        
 
         <div className="grid gap-6 lg:grid-cols-[340px,minmax(0,1fr)]">
           <div className="space-y-6">
