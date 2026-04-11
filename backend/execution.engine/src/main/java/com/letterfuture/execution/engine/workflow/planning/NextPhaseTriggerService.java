@@ -15,6 +15,8 @@ public class NextPhaseTriggerService {
 
     private final GoalRepository goalRepository;
 
+    private final ProgressivePlanningService progressivePlanningService;
+
     @Transactional
     public NextPhaseTriggerResult handlePhaseEvaluation(
             PhaseCompletionEvaluator.PhaseEvaluationResult evaluationResult
@@ -36,6 +38,7 @@ public class NextPhaseTriggerService {
                     "No goalId present in phase evaluation result."
             );
         }
+
 
         Goal goal = goalRepository.findById(evaluationResult.goalId())
                 .orElseThrow(() -> new IllegalArgumentException(
@@ -74,11 +77,13 @@ public class NextPhaseTriggerService {
         }
 
         if (equalsIgnoreCase(goal.getPlanningState(), "GENERATING_NEXT_PHASE")) {
+            progressivePlanningService.generateNextPhase(goal.getId());
+
             return new NextPhaseTriggerResult(
                     true,
-                    false,
+                    true,
                     goal.getId(),
-                    "Next phase generation is required."
+                    "Next phase generation started."
             );
         }
 

@@ -78,7 +78,24 @@ public class NextPhaseGenerationService {
         try {
             log.debug("Processing next phase response for goal {}: {}", goalId, nextPhaseJson);
 
-            JsonNode response = objectMapper.readTree(nextPhaseJson);
+            JsonNode envelope = objectMapper.readTree(nextPhaseJson);
+
+            JsonNode outputTextNode = envelope
+                    .path("output")
+                    .path(0)
+                    .path("content")
+                    .path(0)
+                    .path("text");
+
+            if (outputTextNode.isMissingNode() || outputTextNode.isNull()) {
+                throw new IllegalArgumentException(
+                        "Missing output[0].content[0].text in OpenAI response"
+                );
+            }
+
+            String structuredJson = outputTextNode.asText();
+            JsonNode response = objectMapper.readTree(structuredJson);
+
             boolean isComplete = response.path("complete").asBoolean(false);
 
             if (isComplete) {
@@ -87,23 +104,28 @@ public class NextPhaseGenerationService {
                 return null;
             }
 
-            if (response.has("phase")) {
-                String phaseJson = objectMapper.writeValueAsString(response.get("phase"));
-                log.debug("Extracted phase JSON for goal {}: {}", goalId, phaseJson);
+            JsonNode phaseNode = response.path("phase");
 
-                UUID nextPhaseId = planCompiler.compileAndAppendNextPhase(goalId, phaseJson);
-
-                log.info(
-                        "Successfully generated and persisted next phase {} for goal {}.",
-                        nextPhaseId,
-                        goalId
+            if (phaseNode.isMissingNode() || phaseNode.isNull()) {
+                log.error("Response missing 'phase' field. Parsed response: {}", structuredJson);
+                throw new IllegalArgumentException(
+                        "Expected phase field in response when complete=false"
                 );
-
-                return nextPhaseId;
             }
 
-            log.error("Response missing 'phase' field. Response: {}", nextPhaseJson);
-            throw new IllegalArgumentException("Expected phase field in response when complete=false");
+            String phaseJson = objectMapper.writeValueAsString(phaseNode);
+            log.debug("Extracted phase JSON for goal {}: {}", goalId, phaseJson);
+
+            UUID nextPhaseId = planCompiler.compileAndAppendNextPhase(goalId, phaseJson);
+
+            log.info(
+                    "Successfully generated and persisted next phase {} for goal {}.",
+                    nextPhaseId,
+                    goalId
+            );
+
+            return nextPhaseId;
+
         } catch (Exception e) {
             log.error(
                     "Failed to process next phase response for goal {}: {} - Response: {}",

@@ -151,7 +151,7 @@ public class PlanningPromptFactory {
               "input": [
                 {
                   "role": "developer",
-                  "content": "You are a planning engine for an execution app.\\nReturn only valid JSON matching the schema and rules exactly. For the goal '%s', the user is completing Phase %d of %d total phases. Here is the phase history:\\n%s\\nThe user just completed the previous phase with these responses:\\n%s\\nDecide the next phase based on the user's actual progress and responses. Consider if the user is tracking well or needs adjustments. If this is the final phase (phase number equals total phases) and progress looks good, then return {\\\"complete\\\": true}.\\nOtherwise, generate the next phase with customized tasks and questions that build on the user's previous progress.\\nHard requirements: if phase_number equals total_phases, determine completion based on user progress; if complete=true, do not include phase field; if complete=false, phase.title must be non-empty; duration_days must be an integer between 7 and 365; tasks must contain 1 to 8 items; every task must have 3-4 questions customized for the user's responses; every task title and description must be non-empty; every task day must be an integer between 1 and 3650; do not include any prose outside the JSON."
+                  "content": "You are a planning engine for an execution app.\\nReturn only valid JSON matching the schema and rules exactly. For the goal '%s', the user is completing Phase %d of %d total phases. Here is the phase history:\\n%s\\nThe user just completed the previous phase with these responses:\\n%s\\nDecide the next phase based on the user's actual progress and responses. Consider if the user is tracking well or needs adjustments. If this is the final phase (phase number equals total phases) and progress looks good, then return {\\\"complete\\\": true, \\\"phase\\\": null}.\\nOtherwise, generate the next phase with customized tasks and questions that build on the user's previous progress.\\nHard requirements: if phase_number equals total_phases, determine completion based on user progress; if complete=true, set phase to null; if complete=false, phase must be present with a non-empty title; duration_days must be an integer between 7 and 365; tasks must contain 1 to 8 items; every task must have 3-4 questions customized for the user's responses; every task title and description must be non-empty; every task day must be an integer between 1 and 3650; do not include any prose outside the JSON."
                 }
               ],
               "text": {
@@ -164,7 +164,7 @@ public class PlanningPromptFactory {
                     "properties": {
                       "complete": { "type": "boolean" },
                       "phase": {
-                        "type": "object",
+                        "type": ["object", "null"],
                         "additionalProperties": false,
                         "properties": {
                           "title": { "type": "string", "minLength": 1 },
@@ -206,15 +206,7 @@ public class PlanningPromptFactory {
                         "required": ["title", "duration_days", "tasks"]
                       }
                     },
-                    "required": ["complete"],
-                    "if": {
-                      "properties": {
-                        "complete": { "const": false }
-                      }
-                    },
-                    "then": {
-                      "required": ["phase"]
-                    }
+                    "required": ["complete", "phase"]
                   }
                 }
               }

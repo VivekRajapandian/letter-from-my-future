@@ -13,7 +13,7 @@ import com.letterfuture.execution.engine.workflow.dto.PhaseDto;
 import com.letterfuture.execution.engine.workflow.dto.TaskQuestionInputDto;
 import com.letterfuture.execution.engine.workflow.domain.*;
 import com.letterfuture.execution.engine.workflow.repository.*;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validator;
 import lombok.RequiredArgsConstructor;
@@ -189,7 +189,7 @@ public class PlanCompiler {
         return goal.getId();
     }
 
-    @org.springframework.transaction.annotation.Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional
     public UUID compileAndAppendNextPhase(UUID goalId, String rawPhaseJson) {
         PhaseDto dto = parseNextPhasePlan(rawPhaseJson);
         validateNextPhase(dto);
@@ -198,24 +198,20 @@ public class PlanCompiler {
         enforceNextPhaseLimits(dto, goalId);
         String persistedPlanJson = serializePhase(dto);
 
-        // Mark current phase as completed
-        Phase currentPhase = phaseRepo.findByGoalIdAndStatus(goalId, PhaseStatus.CURRENT)
-                .orElseThrow(() -> new IllegalStateException("Current phase not found for goal " + goalId));
-        currentPhase.setStatus(PhaseStatus.COMPLETED);
-        phaseRepo.save(currentPhase);
+        List<Phase> phases = phaseRepo.findByGoalIdOrderByOrderIndexAsc(goalId);
 
-        // Get the next PLANNED phase (should already exist from initialization)
-        Phase nextPhase = phaseRepo.findFirstByGoalIdAndStatusOrderByOrderIndex(goalId, PhaseStatus.PLANNED)
-                .orElseThrow(() -> new IllegalStateException("Next phase not found (should have been created at goal initialization)"));
-        
-        // Update the pending phase with details and mark as current
+        Phase nextPhase = phases.stream()
+                .filter(phase -> phase.getStatus() != PhaseStatus.COMPLETED)
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("Next phase not found for goal: " + goalId));
+
         nextPhase.setStatus(PhaseStatus.CURRENT);
         nextPhase.setDurationDays(dto.getDurationDays());
         phaseRepo.save(nextPhase);
 
-        // Populate tasks for this phase
         boolean firstTaskUnlocked = false;
         int taskIndex = 0;
+
         for (var taskDto : dto.getTasks()) {
             Task task = new Task();
             task.setId(UUID.randomUUID());
@@ -235,8 +231,6 @@ public class PlanCompiler {
             }
 
             taskRepo.save(task);
-            
-            // Save task questions if provided
             saveTaskQuestions(task.getId(), taskDto.getQuestions());
         }
 
