@@ -17,10 +17,15 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.util.*;
-import java.util.function.Function;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
+import static org.springframework.http.HttpStatus.FORBIDDEN;
 import static org.springframework.http.HttpStatus.NOT_FOUND;
 
 @Service
@@ -42,8 +47,9 @@ public class GoalExecutionQueryService {
                         "Goal not found: " + goalId
                 ));
 
-        List<Phase> phases = phaseRepository.findByGoalIdOrderByOrderIndexAsc(goalId);
+        validateGoalOwnership(goal, userId);
 
+        List<Phase> phases = phaseRepository.findByGoalIdOrderByOrderIndexAsc(goalId);
         Phase activePhase = resolveActivePhase(phases);
 
         List<Task> tasks = activePhase == null
@@ -58,7 +64,7 @@ public class GoalExecutionQueryService {
                 loadInputDefinitionsByTaskId(taskIds);
 
         Map<UUID, TaskSubmission> latestSubmissionByTaskId =
-                loadLatestSubmissionByTaskId(taskIds);
+                loadLatestSubmissionByTaskId(taskIds, userId);
 
         Map<UUID, List<TaskSubmissionValue>> submissionValuesBySubmissionId =
                 loadSubmissionValuesBySubmissionId(latestSubmissionByTaskId.values());
@@ -74,6 +80,15 @@ public class GoalExecutionQueryService {
         );
     }
 
+    private void validateGoalOwnership(Goal goal, UUID userId) {
+        if (goal.getUserId() == null || !goal.getUserId().equals(userId)) {
+            throw new ResponseStatusException(
+                    FORBIDDEN,
+                    "Goal does not belong to user: " + userId
+            );
+        }
+    }
+
     private Map<UUID, List<TaskInputDefinition>> loadInputDefinitionsByTaskId(List<UUID> taskIds) {
         if (taskIds == null || taskIds.isEmpty()) {
             return Map.of();
@@ -85,8 +100,9 @@ public class GoalExecutionQueryService {
         return inputDefinitions.stream()
                 .collect(Collectors.groupingBy(
                         TaskInputDefinition::getTaskId,
-                        Collectors.collectingAndThen(Collectors.toList(), list ->
-                                list.stream()
+                        Collectors.collectingAndThen(
+                                Collectors.toList(),
+                                list -> list.stream()
                                         .sorted(Comparator.comparing(
                                                 TaskInputDefinition::getOrderIndex,
                                                 Comparator.nullsLast(Integer::compareTo)
@@ -96,18 +112,18 @@ public class GoalExecutionQueryService {
                 ));
     }
 
-    private Map<UUID, TaskSubmission> loadLatestSubmissionByTaskId(List<UUID> taskIds) {
+    private Map<UUID, TaskSubmission> loadLatestSubmissionByTaskId(List<UUID> taskIds, UUID userId) {
         if (taskIds == null || taskIds.isEmpty()) {
             return Map.of();
         }
 
-        List<TaskSubmission> submissions = taskSubmissionRepository.findByTaskIdIn(taskIds);
+        List<TaskSubmission> submissions =
+                taskSubmissionRepository.findByTaskIdInAndUserId(taskIds, userId);
 
         Map<UUID, TaskSubmission> latestByTaskId = new HashMap<>();
 
         for (TaskSubmission submission : submissions) {
             TaskSubmission existing = latestByTaskId.get(submission.getTaskId());
-
             if (existing == null || isLater(submission, existing)) {
                 latestByTaskId.put(submission.getTaskId(), submission);
             }
@@ -165,14 +181,12 @@ public class GoalExecutionQueryService {
     }
 
     private boolean isActivePhase(Phase phase) {
-        return equalsIgnoreCase(phase.getStatus().toString().toString(), "ACTIVE");
+        return phase.getStatus() != null
+                && "ACTIVE".equalsIgnoreCase(phase.getStatus().name());
     }
 
     private boolean isIncompletePhase(Phase phase) {
-        return !equalsIgnoreCase(phase.getStatus().toString(), "COMPLETED");
-    }
-
-    private boolean equalsIgnoreCase(String left, String right) {
-        return left != null && left.equalsIgnoreCase(right);
+        return phase.getStatus() == null
+                || !"COMPLETED".equalsIgnoreCase(phase.getStatus().name());
     }
 }

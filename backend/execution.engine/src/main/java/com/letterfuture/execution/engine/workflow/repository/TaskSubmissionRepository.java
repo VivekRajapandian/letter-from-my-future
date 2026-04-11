@@ -9,6 +9,13 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface TaskSubmissionRepository extends JpaRepository<TaskSubmission, UUID> {
+
     List<TaskSubmission> findByTaskIdIn(Collection<UUID> taskIds);
+
+    List<TaskSubmission> findByTaskIdInAndUserId(Collection<UUID> taskIds, UUID userId);
+
     Optional<TaskSubmission> findTopByTaskIdOrderBySubmittedAtDesc(UUID taskId);
+
+    Optional<TaskSubmission> findTopByTaskIdAndUserIdOrderBySubmittedAtDesc(UUID taskId, UUID userId);
+
 }

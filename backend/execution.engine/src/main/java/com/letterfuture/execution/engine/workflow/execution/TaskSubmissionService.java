@@ -23,7 +23,11 @@ import org.springframework.web.server.ResponseStatusException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -46,10 +50,10 @@ public class TaskSubmissionService {
     public TaskSubmitResponse submit(UUID taskId, TaskSubmitRequest request) {
         validateRequest(request);
 
-        Task task = taskRepository.findById(taskId)
+        Task task = taskRepository.findByIdAndUser(taskId, request.userId())
                 .orElseThrow(() -> new ResponseStatusException(
                         NOT_FOUND,
-                        "Task not found: " + taskId
+                        "Task not found for user: " + taskId
                 ));
 
         List<TaskInputDefinition> inputDefinitions =
@@ -67,7 +71,6 @@ public class TaskSubmissionService {
         submission.setAction(normalizeAction(request.action()));
         submission.setNote(blankToNull(request.note()));
         submission.setSubmittedAt(LocalDateTime.now());
-
         taskSubmissionRepository.save(submission);
 
         List<TaskSubmissionValue> valuesToSave = buildSubmissionValues(
@@ -101,11 +104,9 @@ public class TaskSubmissionService {
         if (request == null) {
             throw new ResponseStatusException(BAD_REQUEST, "Request body is required.");
         }
-
         if (request.userId() == null) {
             throw new ResponseStatusException(BAD_REQUEST, "userId is required.");
         }
-
         if (isBlank(request.action())) {
             throw new ResponseStatusException(BAD_REQUEST, "action is required.");
         }
@@ -115,11 +116,9 @@ public class TaskSubmissionService {
             List<TaskSubmitValueDto> values,
             Map<UUID, TaskInputDefinition> inputDefinitionById
     ) {
-        if (values == null || values.isEmpty()) {
-            return;
-        }
+        List<TaskSubmitValueDto> safeValues = values == null ? List.of() : values;
 
-        for (TaskSubmitValueDto valueDto : values) {
+        for (TaskSubmitValueDto valueDto : safeValues) {
             if (valueDto.inputDefinitionId() == null) {
                 throw new ResponseStatusException(
                         BAD_REQUEST,
@@ -135,30 +134,43 @@ public class TaskSubmissionService {
             }
         }
 
-        List<TaskInputDefinition> requiredInputs = inputDefinitionById.values().stream()
-                .filter(TaskInputDefinition::isRequired)
-                .toList();
-
-        Map<UUID, Object> submittedByInputId = (values == null ? List.<TaskSubmitValueDto>of() : values).stream()
+        Map<UUID, Object> submittedByInputId = safeValues.stream()
                 .collect(Collectors.toMap(
                         TaskSubmitValueDto::inputDefinitionId,
                         TaskSubmitValueDto::value,
                         (left, right) -> right
                 ));
 
+        List<TaskInputDefinition> requiredInputs = inputDefinitionById.values().stream()
+                .filter(TaskInputDefinition::isRequired)
+                .toList();
+
         for (TaskInputDefinition requiredInput : requiredInputs) {
             if (!submittedByInputId.containsKey(requiredInput.getId())) {
-                continue;
+                throw new ResponseStatusException(
+                        BAD_REQUEST,
+                        "Required input is missing: " + requiredInput.getLabel()
+                );
             }
 
             Object submittedValue = submittedByInputId.get(requiredInput.getId());
-            if (submittedValue == null || (submittedValue instanceof String s && s.isBlank())) {
+            if (isEffectivelyBlank(submittedValue)) {
                 throw new ResponseStatusException(
                         BAD_REQUEST,
                         "Required input is missing a value: " + requiredInput.getLabel()
                 );
             }
         }
+    }
+
+    private boolean isEffectivelyBlank(Object value) {
+        if (value == null) {
+            return true;
+        }
+        if (value instanceof String s) {
+            return s.isBlank();
+        }
+        return false;
     }
 
     private List<TaskSubmissionValue> buildSubmissionValues(
@@ -174,13 +186,13 @@ public class TaskSubmissionService {
 
         for (TaskSubmitValueDto dto : submittedValues) {
             TaskInputDefinition definition = inputDefinitionById.get(dto.inputDefinitionId());
+
             TaskSubmissionValue entity = new TaskSubmissionValue();
             entity.setId(UUID.randomUUID());
             entity.setSubmissionId(submissionId);
             entity.setInputDefinitionId(dto.inputDefinitionId());
 
             mapTypedValue(entity, definition, dto.value());
-
             values.add(entity);
         }
 
